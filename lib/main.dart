@@ -108,6 +108,26 @@ class _MainShellState extends State<MainShell> {
     });
   }
 
+  Future<void> _updateLearningItemCategory(
+    String id,
+    String category,
+  ) async {
+    final updatedItems = _savedItems
+        .map(
+          (item) => item.id == id
+              ? item.copyWith(category: category)
+              : item,
+        )
+        .toList(growable: false);
+
+    await _learningStore.saveItems(updatedItems);
+    if (!mounted) return;
+
+    setState(() {
+      _savedItems = updatedItems;
+    });
+  }
+
   void _openSavedItems() {
     if (!mounted) return;
     setState(() => _index = 3);
@@ -126,6 +146,7 @@ class _MainShellState extends State<MainShell> {
         items: _savedItems,
         isLoading: _isLoadingSavedItems,
         onDelete: _deleteLearningItem,
+        onCategoryChanged: _updateLearningItemCategory,
       ),
       const ProfileScreen(),
     ];
