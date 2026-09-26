@@ -17,6 +17,7 @@ import 'package:linguamate/services/ai_chat_store.dart';
 import 'package:linguamate/services/backup_codec.dart';
 import 'package:linguamate/services/learning_store.dart';
 import 'package:linguamate/widgets/gilded_card_icon.dart';
+import 'package:linguamate/widgets/shili_coach_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -211,6 +212,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AI 對話教練'), findsOneWidget);
+    expect(find.text('汐璃 Shili'), findsOneWidget);
+    expect(find.byType(ShiliCoachAvatar), findsAtLeastNWidgets(1));
     expect(find.text('English'), findsOneWidget);
     expect(find.text('Tagalog'), findsOneWidget);
     expect(find.text('Taglish'), findsOneWidget);
@@ -232,6 +235,7 @@ void main() {
     expect(find.text('I went to the gym after work today.'), findsOneWidget);
     expect(find.text('💡 學習提示'), findsOneWidget);
     expect(find.text('🇹🇼 中文意思'), findsOneWidget);
+    expect(find.byType(ShiliCoachAvatar), findsAtLeastNWidgets(2));
 
     final saveButton = find.byKey(
       const ValueKey('save-chat-learning-card'),
