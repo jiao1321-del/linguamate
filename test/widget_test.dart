@@ -285,7 +285,18 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byKey(const ValueKey('send-chat-message')));
+    final sendButton =
+        find.byKey(const ValueKey('send-chat-message'));
+    final gesture = await tester.startGesture(
+      tester.getCenter(sendButton),
+    );
+    await tester.pump();
+
+    // The message must already be dispatched on pointer down, before an iOS
+    // keyboard dismissal can move the button and cancel a normal tap.
+    expect(sentMessage, '無塵室的生產主任，目前剛出產線');
+
+    await gesture.up();
     await tester.pumpAndSettle();
 
     expect(sentMessage, '無塵室的生產主任，目前剛出產線');
