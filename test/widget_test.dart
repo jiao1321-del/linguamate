@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguamate/main.dart';
 import 'package:linguamate/models/language_analysis.dart';
@@ -50,6 +49,7 @@ void main() {
               ],
             ),
             onSave: (_, __) async => true,
+            readClipboardText: () async => 'Kumusta ka?',
             onSaved: () {},
           ),
         ),
@@ -90,8 +90,6 @@ void main() {
   });
 
   testWidgets('LearnScreen pastes clipboard text', (tester) async {
-    await Clipboard.setData(const ClipboardData(text: 'Kumusta ka?'));
-
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -401,6 +399,19 @@ void main() {
         reviewCount: 3,
         lastReviewedAt: now,
         nextReviewAt: now.add(const Duration(days: 3)),
+        analysis: const LanguageAnalysis(
+          detectedLanguage: 'English',
+          chinese: '我晚點回覆。',
+          english: 'I will reply later.',
+          tagalog: 'Babalikan kita mamaya.',
+          tone: '自然。',
+          learningPoints: [
+            LearningPoint(
+              title: 'mamaya',
+              explanation: '稍後。',
+            ),
+          ],
+        ),
       ),
     ];
 
