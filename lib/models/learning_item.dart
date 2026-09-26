@@ -1,3 +1,5 @@
+import 'language_analysis.dart';
+
 class LearningItem {
   static const uncategorized = '未分類';
   static const reviewIntervalsInDays = <int>[1, 3, 7, 14, 30];
@@ -10,6 +12,7 @@ class LearningItem {
   final int reviewCount;
   final DateTime? lastReviewedAt;
   final DateTime? nextReviewAt;
+  final LanguageAnalysis? analysis;
 
   const LearningItem({
     required this.id,
@@ -20,7 +23,10 @@ class LearningItem {
     this.reviewCount = 0,
     this.lastReviewedAt,
     this.nextReviewAt,
+    this.analysis,
   });
+
+  bool get hasAnalysis => analysis != null;
 
   bool isDue(DateTime now) {
     final dueAt = nextReviewAt;
@@ -61,6 +67,7 @@ class LearningItem {
     int? reviewCount,
     DateTime? lastReviewedAt,
     DateTime? nextReviewAt,
+    LanguageAnalysis? analysis,
   }) {
     return LearningItem(
       id: id ?? this.id,
@@ -71,6 +78,7 @@ class LearningItem {
       reviewCount: reviewCount ?? this.reviewCount,
       lastReviewedAt: lastReviewedAt ?? this.lastReviewedAt,
       nextReviewAt: nextReviewAt ?? this.nextReviewAt,
+      analysis: analysis ?? this.analysis,
     );
   }
 
@@ -84,10 +92,13 @@ class LearningItem {
       'reviewCount': reviewCount,
       'lastReviewedAt': lastReviewedAt?.toIso8601String(),
       'nextReviewAt': nextReviewAt?.toIso8601String(),
+      'analysis': analysis?.toJson(),
     };
   }
 
   factory LearningItem.fromJson(Map<String, dynamic> json) {
+    final rawAnalysis = json['analysis'];
+
     return LearningItem(
       id: json['id'] as String,
       text: json['text'] as String,
@@ -97,6 +108,11 @@ class LearningItem {
       reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       lastReviewedAt: _parseOptionalDate(json['lastReviewedAt']),
       nextReviewAt: _parseOptionalDate(json['nextReviewAt']),
+      analysis: rawAnalysis is Map
+          ? LanguageAnalysis.fromJson(
+              Map<String, dynamic>.from(rawAnalysis),
+            )
+          : null,
     );
   }
 
