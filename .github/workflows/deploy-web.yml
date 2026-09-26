@@ -44,10 +44,42 @@ jobs:
         run: flutter test
 
       - name: Build Web
-        run: flutter build web --release --base-href "/linguamate/"
+        run: flutter build web --release --base-href "/linguamate/" --pwa-strategy=none
 
       - name: Finalize Pages files
         run: |
+          cat > build/web/flutter_service_worker.js <<'EOF'
+          self.addEventListener('install', () => {
+            self.skipWaiting();
+          });
+
+          self.addEventListener('activate', (event) => {
+            event.waitUntil((async () => {
+              const keys = await caches.keys();
+              await Promise.all(
+                keys
+                  .filter((key) =>
+                    key === 'flutter-app-cache' ||
+                    key === 'flutter-temp-cache' ||
+                    key.startsWith('linguamate-')
+                  )
+                  .map((key) => caches.delete(key))
+              );
+
+              await self.registration.unregister();
+
+              const clients = await self.clients.matchAll({
+                type: 'window',
+                includeUncontrolled: true,
+              });
+
+              for (const client of clients) {
+                client.navigate(client.url);
+              }
+            })());
+          });
+          EOF
+
           cp build/web/index.html build/web/404.html
           touch build/web/.nojekyll
 
