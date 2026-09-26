@@ -5,6 +5,7 @@ import 'screens/ai_chat_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/review_screen.dart';
 import 'screens/saved_screen.dart';
 import 'services/learning_store.dart';
 
@@ -135,13 +136,28 @@ class _MainShellState extends State<MainShell> {
 
   void _openSavedItems() => _openPage(3);
 
+  Future<void> _startReview() async {
+    if (_isLoadingSavedItems) return;
+
+    if (_savedItems.isEmpty) {
+      _openPage(1);
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => ReviewScreen(items: _savedItems),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
       HomeScreen(
         items: _savedItems,
         isLoading: _isLoadingSavedItems,
-        onStartLearning: () => _openPage(1),
+        onStartReview: _startReview,
       ),
       LearnScreen(
         onSave: _saveLearningItem,
