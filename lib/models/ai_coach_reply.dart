@@ -13,6 +13,15 @@ class AiCoachReply {
 
   bool get hasCorrection => correction.trim().isNotEmpty;
 
+  Map<String, dynamic> toJson() {
+    return {
+      'reply': reply,
+      'correction': correction,
+      'explanation': explanation,
+      'translation': translation,
+    };
+  }
+
   factory AiCoachReply.fromJson(Map<String, dynamic> json) {
     return AiCoachReply(
       reply: (json['reply'] as String? ?? '').trim(),
