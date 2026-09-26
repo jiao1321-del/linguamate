@@ -207,13 +207,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final selected = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) {
+        final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
+
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
               children: [
                 Text(
                   '話題靈感 · $_scenario',
