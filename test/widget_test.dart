@@ -429,12 +429,22 @@ void main() {
 
     expect(find.text('本次對話回顧'), findsOneWidget);
     expect(find.text('1 個對話回合 · 1 個修正重點'), findsOneWidget);
+    final reviewCard = find.byKey(
+      const ValueKey('conversation-review-card-2'),
+    );
+    expect(reviewCard, findsOneWidget);
     expect(
-      find.text('The machine stopped during inspection.'),
+      find.descendant(
+        of: reviewCard,
+        matching: find.text('The machine stopped during inspection.'),
+      ),
       findsOneWidget,
     );
     expect(
-      find.text('The machine stopped during the inspection.'),
+      find.descendant(
+        of: reviewCard,
+        matching: find.text('The machine stopped during the inspection.'),
+      ),
       findsOneWidget,
     );
     expect(find.text('特定的檢驗流程前面加 the 會更自然。'), findsOneWidget);
