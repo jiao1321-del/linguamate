@@ -96,6 +96,18 @@ class _MainShellState extends State<MainShell> {
     return true;
   }
 
+  Future<void> _deleteLearningItem(String id) async {
+    final updatedItems =
+        _savedItems.where((item) => item.id != id).toList(growable: false);
+
+    await _learningStore.saveItems(updatedItems);
+    if (!mounted) return;
+
+    setState(() {
+      _savedItems = updatedItems;
+    });
+  }
+
   void _openSavedItems() {
     if (!mounted) return;
     setState(() => _index = 3);
@@ -113,6 +125,7 @@ class _MainShellState extends State<MainShell> {
       SavedScreen(
         items: _savedItems,
         isLoading: _isLoadingSavedItems,
+        onDelete: _deleteLearningItem,
       ),
       const ProfileScreen(),
     ];

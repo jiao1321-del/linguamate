@@ -16,20 +16,30 @@ void main() {
     expect(find.text('LinguaMate'), findsOneWidget);
   });
 
-  test('LearningStore persists saved sentences', () async {
+  test('LearningStore persists and removes saved sentences', () async {
     final store = LearningStore();
-    final item = LearningItem(
+    final first = LearningItem(
       id: 'test-1',
-      text: 'This is my saved sentence.',
+      text: 'This is my first saved sentence.',
       createdAt: DateTime(2026, 9, 27),
     );
+    final second = LearningItem(
+      id: 'test-2',
+      text: 'This sentence should remain.',
+      createdAt: DateTime(2026, 9, 28),
+    );
 
-    await store.saveItems([item]);
+    await store.saveItems([first, second]);
     final loaded = await store.loadItems();
 
-    expect(loaded, hasLength(1));
-    expect(loaded.first.id, item.id);
-    expect(loaded.first.text, item.text);
-    expect(loaded.first.createdAt, item.createdAt);
+    expect(loaded, hasLength(2));
+
+    final remaining = loaded.where((item) => item.id != first.id).toList();
+    await store.saveItems(remaining);
+
+    final reloaded = await store.loadItems();
+    expect(reloaded, hasLength(1));
+    expect(reloaded.first.id, second.id);
+    expect(reloaded.first.text, second.text);
   });
 }

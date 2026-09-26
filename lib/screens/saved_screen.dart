@@ -5,11 +5,13 @@ import '../models/learning_item.dart';
 class SavedScreen extends StatelessWidget {
   final List<LearningItem> items;
   final bool isLoading;
+  final Future<void> Function(String id) onDelete;
 
   const SavedScreen({
     super.key,
     required this.items,
     required this.isLoading,
+    required this.onDelete,
   });
 
   String _formatDate(DateTime dateTime) {
@@ -19,17 +21,64 @@ class SavedScreen extends StatelessWidget {
     return '${local.year}/$month/$day';
   }
 
+  Future<void> _confirmDelete(
+    BuildContext context,
+    LearningItem item,
+  ) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('刪除收藏？'),
+          content: Text(
+            '確定要刪除這句嗎？\n\n${item.text}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('刪除'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true || !context.mounted) return;
+
+    await onDelete(item.id);
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已刪除收藏。')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
         children: [
-          Text(
-            '我的收藏',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '我的收藏',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                 ),
+              ),
+              if (!isLoading)
+                Chip(
+                  avatar: const Icon(Icons.bookmark_rounded, size: 18),
+                  label: Text('${items.length} 句'),
+                ),
+            ],
           ),
           const SizedBox(height: 6),
           const Text('把真實遇到的句子變成自己的教材。'),
@@ -88,7 +137,11 @@ class SavedScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 7),
                     child: Text('收藏於 ${_formatDate(item.createdAt)}'),
                   ),
-                  trailing: const Chip(label: Text('新句子')),
+                  trailing: IconButton(
+                    tooltip: '刪除收藏',
+                    onPressed: () => _confirmDelete(context, item),
+                    icon: const Icon(Icons.delete_outline_rounded),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
