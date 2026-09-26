@@ -41,7 +41,7 @@ class LearningItem {
     }
 
     final nextLevel =
-        (reviewLevel + 1).clamp(1, reviewIntervalsInDays.length);
+        (reviewLevel + 1).clamp(1, reviewIntervalsInDays.length).toInt();
     final intervalDays = reviewIntervalsInDays[nextLevel - 1];
 
     return copyWith(
