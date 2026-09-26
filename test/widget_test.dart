@@ -7,6 +7,7 @@ import 'package:linguamate/models/learning_item.dart';
 import 'package:linguamate/screens/home_screen.dart';
 import 'package:linguamate/screens/review_screen.dart';
 import 'package:linguamate/screens/saved_screen.dart';
+import 'package:linguamate/services/backup_codec.dart';
 import 'package:linguamate/services/learning_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -219,6 +220,45 @@ void main() {
     expect(reset.reviewCount, 3);
     expect(reset.nextReviewAt, secondNow);
     expect(reset.isDue(secondNow), isTrue);
+  });
+
+  test('BackupCodec preserves learning and SRS data', () {
+    final now = DateTime.utc(2026, 9, 27, 2);
+    final items = [
+      LearningItem(
+        id: 'backup-1',
+        text: 'I will reply later.',
+        createdAt: now,
+        category: 'English',
+        reviewLevel: 2,
+        reviewCount: 3,
+        lastReviewedAt: now,
+        nextReviewAt: now.add(const Duration(days: 3)),
+      ),
+    ];
+
+    final code = BackupCodec.encode(items);
+    expect(code, startsWith(BackupCodec.prefix));
+
+    final restored = BackupCodec.decode(code);
+    expect(restored, hasLength(1));
+    expect(restored.first.id, 'backup-1');
+    expect(restored.first.text, 'I will reply later.');
+    expect(restored.first.category, 'English');
+    expect(restored.first.reviewLevel, 2);
+    expect(restored.first.reviewCount, 3);
+    expect(restored.first.lastReviewedAt, now);
+    expect(
+      restored.first.nextReviewAt,
+      now.add(const Duration(days: 3)),
+    );
+  });
+
+  test('BackupCodec rejects invalid backup codes', () {
+    expect(
+      () => BackupCodec.decode('not-a-linguamate-backup'),
+      throwsFormatException,
+    );
   });
 
   test('LearningStore persists review progress, category and deletion', () async {
