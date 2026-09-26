@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguamate/main.dart';
 import 'package:linguamate/models/ai_chat_state.dart';
@@ -273,10 +274,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byType(TextField),
-      '無塵室的生產主任，目前剛出產線',
+    final field = find.byType(TextField);
+    await tester.showKeyboard(field);
+    const composingText = '無塵室的生產主任，目前剛出產線';
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: composingText,
+        selection: TextSelection.collapsed(offset: composingText.length),
+        composing: TextRange(start: 14, end: composingText.length),
+      ),
     );
+    await tester.pump();
+
     await tester.tap(find.byKey(const ValueKey('send-chat-message')));
     await tester.pumpAndSettle();
 
