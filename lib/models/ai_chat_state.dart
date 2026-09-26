@@ -33,16 +33,19 @@ class AiChatMessage {
 
 class AiChatState {
   final String targetLanguage;
+  final String scenario;
   final List<AiChatMessage> messages;
 
   const AiChatState({
     required this.targetLanguage,
+    this.scenario = '自由對話',
     required this.messages,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'targetLanguage': targetLanguage,
+      'scenario': scenario,
       'messages': messages.map((message) => message.toJson()).toList(),
     };
   }
@@ -63,6 +66,7 @@ class AiChatState {
 
     return AiChatState(
       targetLanguage: (json['targetLanguage'] as String? ?? 'English').trim(),
+      scenario: (json['scenario'] as String? ?? '自由對話').trim(),
       messages: messages,
     );
   }
