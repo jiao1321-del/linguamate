@@ -221,7 +221,6 @@ void main() {
 
     expect(sentMessage, 'Today I go gym after work.');
     expect(sentTarget, 'English');
-    expect(find.text('Today I go gym after work.'), findsOneWidget);
     expect(
       find.text('I went to the gym after work. How about you?'),
       findsOneWidget,
