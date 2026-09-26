@@ -4,6 +4,8 @@ import '../models/ai_chat_state.dart';
 import '../models/ai_coach_reply.dart';
 import '../services/ai_chat_store.dart';
 import '../widgets/gilded_card_icon.dart';
+import '../widgets/shili_coach_avatar.dart';
+import '../widgets/shili_coach_header.dart';
 
 typedef AiCoachSender = Future<AiCoachReply> Function(
   String message,
@@ -62,17 +64,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
         return const AiChatMessage(
           mine: false,
           text:
-              'Kumusta! Mag-practice tayo ng natural na Tagalog. Ano ang ginawa mo ngayon?',
+              'Hi, ako si Shili ✨ Mag-practice tayo ng natural na Tagalog. Ano ang gusto mong pag-usapan today?',
         );
       case 'Taglish':
         return const AiChatMessage(
           mine: false,
-          text: 'Hi! Let’s practice natural Taglish. Kumusta ang day mo today?',
+          text:
+              'Hi, I’m Shili ✨ Let’s practice natural Taglish together. Kumusta ang day mo today?',
         );
       default:
         return const AiChatMessage(
           mine: false,
-          text: 'Hi! Let’s practice natural English. What did you do today?',
+          text:
+              'Hi, I’m Shili ✨ Let’s make your English sound more natural. What do you feel like talking about today?',
         );
     }
   }
@@ -276,6 +280,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               ],
             ),
           ),
+          ShiliCoachHeader(targetLanguage: _targetLanguage),
           SizedBox(
             height: 42,
             child: ListView.separated(
@@ -399,25 +404,48 @@ class _ConversationEntry extends StatelessWidget {
       crossAxisAlignment:
           entry.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        Align(
-          alignment:
-              entry.mine ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 320),
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
+        if (entry.mine)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 320),
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: SelectableText(entry.text),
             ),
-            decoration: BoxDecoration(
-              color: entry.mine
-                  ? Theme.of(context).colorScheme.primaryContainer
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(18),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const ShiliCoachAvatar(size: 34),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 278),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: SelectableText(entry.text),
+                  ),
+                ),
+              ],
             ),
-            child: SelectableText(entry.text),
           ),
-        ),
         if (reply != null)
           Container(
             constraints: const BoxConstraints(maxWidth: 340),
@@ -496,23 +524,35 @@ class _ThinkingBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
+            const ShiliCoachAvatar(size: 34),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 10),
+                  Text('Shili 正在想怎麼回你...'),
+                ],
+              ),
             ),
-            SizedBox(width: 10),
-            Text('AI 思考中...'),
           ],
         ),
       ),
