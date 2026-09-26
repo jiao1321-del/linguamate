@@ -214,7 +214,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('AI 對話教練'), findsOneWidget);
+    expect(find.text('AI 對話教練'), findsNothing);
     expect(find.text('汐璃 Shili'), findsOneWidget);
     expect(find.byType(ShiliCoachAvatar), findsAtLeastNWidgets(1));
     final coachPanel = find.byType(ShiliCoachHeader);
@@ -230,6 +230,13 @@ void main() {
       find.descendant(
         of: coachPanel,
         matching: find.byKey(const ValueKey('scenario-selector')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: coachPanel,
+        matching: find.byKey(const ValueKey('clear-chat-button')),
       ),
       findsOneWidget,
     );
@@ -293,6 +300,50 @@ void main() {
 
     expect(savedLearningText, 'I went to the gym after work today.');
     expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
+  });
+
+  testWidgets('starter idea can be sent with the visible send button',
+      (tester) async {
+    String? sentMessage;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiChatScreen(
+            onSend: (message, targetLanguage, scenario, history) async {
+              sentMessage = message;
+              return const AiCoachReply(
+                reply: 'Let’s check the production line issue together.',
+                correction: '',
+                explanation: '自然承接工作情境。',
+                translation: '我們一起確認生產線的問題。',
+              );
+            },
+            onSaveLearning: (_) async => true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('scenario-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('工作職場').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('starter-ideas-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('There is a problem on the production line.'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('send-chat-message')));
+    await tester.pumpAndSettle();
+
+    expect(sentMessage, 'There is a problem on the production line.');
+    expect(
+      find.text('Let’s check the production line issue together.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('AI chat can send from the keyboard send action',
@@ -367,13 +418,9 @@ void main() {
 
     final sendButton =
         find.byKey(const ValueKey('send-chat-message'));
-    final gesture = await tester.startGesture(
-      tester.getCenter(sendButton),
-    );
+    await tester.tap(sendButton);
     await tester.pump();
 
-    // The message must already be dispatched on pointer down, before an iOS
-    // keyboard dismissal can move the button and cancel a normal tap.
     expect(sentMessage, '無塵室的生產主任，目前剛出產線');
 
     // Reproduce the late IME update seen on iPhone PWA: after sending, WebKit
@@ -387,7 +434,6 @@ void main() {
       composing: TextRange(start: 14, end: composingText.length),
     );
 
-    await gesture.up();
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pumpAndSettle();
 
