@@ -34,7 +34,6 @@ class ShiliCoachHeader extends StatelessWidget {
   }
 
   Widget _choiceChip({
-    required BuildContext context,
     required String label,
     required bool selected,
     required VoidCallback onTap,
@@ -125,7 +124,6 @@ class ShiliCoachHeader extends StatelessWidget {
             children: languages
                 .map(
                   (language) => _choiceChip(
-                    context: context,
                     label: language,
                     selected: targetLanguage == language,
                     onTap: () => onLanguageSelected(language),
@@ -148,7 +146,6 @@ class ShiliCoachHeader extends StatelessWidget {
             children: scenarios
                 .map(
                   (item) => _choiceChip(
-                    context: context,
                     key: ValueKey('scenario-$item'),
                     label: item,
                     selected: scenario == item,
