@@ -44,7 +44,7 @@ jobs:
         run: flutter test
 
       - name: Smoke test AI chat endpoint
-        if: github.event_name == 'pull_request' && github.head_ref == 'v1.3-ai-chat-coach'
+        if: github.event_name == 'pull_request' && (github.head_ref == 'v1.3-ai-chat-coach' || github.head_ref == 'v1.6-shili-ai-coach')
         run: |
           curl --fail-with-body --silent --show-error \
             --request POST \
