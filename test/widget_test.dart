@@ -35,10 +35,12 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: SavedScreen(
-          items: items,
-          isLoading: false,
-          onDelete: (_) async {},
+        home: Scaffold(
+          body: SavedScreen(
+            items: items,
+            isLoading: false,
+            onDelete: (_) async {},
+          ),
         ),
       ),
     );
