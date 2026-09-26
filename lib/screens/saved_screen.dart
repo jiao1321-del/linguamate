@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/learning_item.dart';
 
-class SavedScreen extends StatelessWidget {
+class SavedScreen extends StatefulWidget {
   final List<LearningItem> items;
   final bool isLoading;
   final Future<void> Function(String id) onDelete;
@@ -14,11 +14,39 @@ class SavedScreen extends StatelessWidget {
     required this.onDelete,
   });
 
+  @override
+  State<SavedScreen> createState() => _SavedScreenState();
+}
+
+class _SavedScreenState extends State<SavedScreen> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   String _formatDate(DateTime dateTime) {
     final local = dateTime.toLocal();
     final month = local.month.toString().padLeft(2, '0');
     final day = local.day.toString().padLeft(2, '0');
     return '${local.year}/$month/$day';
+  }
+
+  List<LearningItem> get _filteredItems {
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return widget.items;
+
+    return widget.items
+        .where((item) => item.text.toLowerCase().contains(query))
+        .toList(growable: false);
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() => _query = '');
   }
 
   Future<void> _confirmDelete(
@@ -49,7 +77,7 @@ class SavedScreen extends StatelessWidget {
 
     if (shouldDelete != true || !context.mounted) return;
 
-    await onDelete(item.id);
+    await widget.onDelete(item.id);
     if (!context.mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -59,6 +87,9 @@ class SavedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final filteredItems = _filteredItems;
+    final hasQuery = _query.trim().isNotEmpty;
+
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
@@ -73,22 +104,51 @@ class SavedScreen extends StatelessWidget {
                       ),
                 ),
               ),
-              if (!isLoading)
+              if (!widget.isLoading)
                 Chip(
                   avatar: const Icon(Icons.bookmark_rounded, size: 18),
-                  label: Text('${items.length} 句'),
+                  label: Text(
+                    hasQuery
+                        ? '${filteredItems.length}/${widget.items.length} 句'
+                        : '${widget.items.length} 句',
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: 6),
           const Text('把真實遇到的句子變成自己的教材。'),
-          const SizedBox(height: 20),
-          if (isLoading)
+          const SizedBox(height: 16),
+          if (!widget.isLoading && widget.items.isNotEmpty) ...[
+            TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _query = value),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: '搜尋收藏，例如 want、reply...',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: hasQuery
+                    ? IconButton(
+                        tooltip: '清除搜尋',
+                        onPressed: _clearSearch,
+                        icon: const Icon(Icons.close_rounded),
+                      )
+                    : null,
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
+          if (widget.isLoading)
             const Padding(
               padding: EdgeInsets.only(top: 60),
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (items.isEmpty)
+          else if (widget.items.isEmpty)
             Card(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -118,8 +178,38 @@ class SavedScreen extends StatelessWidget {
                 ),
               ),
             )
+          else if (filteredItems.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 32,
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.search_off_rounded,
+                      size: 44,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '找不到符合的收藏',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '沒有找到「${_query.trim()}」，換個關鍵字試試看。',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            )
           else
-            for (final item in items) ...[
+            for (final item in filteredItems) ...[
               Card(
                 child: ListTile(
                   contentPadding: const EdgeInsets.symmetric(
