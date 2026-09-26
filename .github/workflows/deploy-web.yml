@@ -51,7 +51,7 @@ jobs:
             'https://svzsynadhzvflauxppwn.supabase.co/functions/v1/chat-language' \
             --header 'Content-Type: application/json' \
             --header 'apikey: sb_publishable_UoxuXbXG8Qvy0Snte4jmPQ_IIPI-IzR' \
-            --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInR5cCI6IkpXVCJ9' \
+            --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2enN5bmFkaHp2ZmxhdXhwcHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0NDIxNjIsImV4cCI6MjEwNjAxODE2Mn0.zhl-nd806Gs_VGmNg70UEKEWwck-Iielnb6JCD8sRjI' \
             --data '{"message":"Today I go gym after work.","targetLanguage":"English","history":[]}' \
             --output /tmp/linguamate-chat-smoke.json
 
