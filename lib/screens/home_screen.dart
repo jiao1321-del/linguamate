@@ -6,13 +6,13 @@ import '../widgets/stat_card.dart';
 class HomeScreen extends StatelessWidget {
   final List<LearningItem> items;
   final bool isLoading;
-  final VoidCallback onStartLearning;
+  final VoidCallback onStartReview;
 
   const HomeScreen({
     super.key,
     required this.items,
     required this.isLoading,
-    required this.onStartLearning,
+    required this.onStartReview,
   });
 
   int get _todayCount {
@@ -43,6 +43,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recentItems = items.take(3).toList(growable: false);
+    final reviewCount = items.length > 10 ? 10 : items.length;
 
     return SafeArea(
       child: ListView(
@@ -102,11 +103,19 @@ class HomeScreen extends StatelessWidget {
                         ),
                   ),
                   const SizedBox(height: 12),
-                  const ListTile(
+                  ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(child: Text('1')),
-                    title: Text('新增 1 個今天真的會用到的句子'),
-                    subtitle: Text('把工作或生活中的句子放進 LinguaMate'),
+                    leading: const CircleAvatar(child: Text('1')),
+                    title: Text(
+                      reviewCount > 0
+                          ? '複習 $reviewCount 個收藏句子'
+                          : '新增 1 個今天真的會用到的句子',
+                    ),
+                    subtitle: Text(
+                      reviewCount > 0
+                          ? '用「記得 / 再複習」快速跑一輪'
+                          : '先建立第一張屬於你的複習卡',
+                    ),
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -119,14 +128,24 @@ class HomeScreen extends StatelessWidget {
                     subtitle: Text(
                       _uncategorizedCount > 0
                           ? '幫句子加上工作、生活或語言分類'
-                          : '今天可以專心新增或複習句子',
+                          : '分類完成，可以專心複習',
                     ),
                   ),
                   const SizedBox(height: 10),
                   FilledButton.icon(
-                    onPressed: onStartLearning,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('開始今日學習'),
+                    onPressed: isLoading ? null : onStartReview,
+                    icon: Icon(
+                      items.isEmpty
+                          ? Icons.add_rounded
+                          : Icons.play_arrow_rounded,
+                    ),
+                    label: Text(
+                      isLoading
+                          ? '準備中...'
+                          : items.isEmpty
+                              ? '新增第一句'
+                              : '開始今日複習',
+                    ),
                   ),
                 ],
               ),
