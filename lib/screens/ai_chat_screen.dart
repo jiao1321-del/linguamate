@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/ai_coach_reply.dart';
+import '../widgets/gilded_card_icon.dart';
 
 typedef AiCoachSender = Future<AiCoachReply> Function(
   String message,
@@ -8,12 +9,16 @@ typedef AiCoachSender = Future<AiCoachReply> Function(
   List<Map<String, String>> history,
 );
 
+typedef ChatLearningSaver = Future<bool> Function(String text);
+
 class AiChatScreen extends StatefulWidget {
   final AiCoachSender onSend;
+  final ChatLearningSaver onSaveLearning;
 
   const AiChatScreen({
     super.key,
     required this.onSend,
+    required this.onSaveLearning,
   });
 
   @override
@@ -28,6 +33,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   String _targetLanguage = 'English';
   bool _isSending = false;
+  int? _savingIndex;
   String? _error;
   late List<_ChatEntry> _entries;
 
@@ -49,7 +55,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
       case 'Tagalog':
         return const _ChatEntry(
           mine: false,
-          text: 'Kumusta! Mag-practice tayo ng natural na Tagalog. Ano ang ginawa mo ngayon?',
+          text:
+              'Kumusta! Mag-practice tayo ng natural na Tagalog. Ano ang ginawa mo ngayon?',
         );
       case 'Taglish':
         return const _ChatEntry(
@@ -65,7 +72,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   void _changeTarget(String language) {
-    if (_isSending || language == _targetLanguage) return;
+    if (_isSending || _savingIndex != null || language == _targetLanguage) {
+      return;
+    }
 
     setState(() {
       _targetLanguage = language;
@@ -76,7 +85,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   void _clearConversation() {
-    if (_isSending) return;
+    if (_isSending || _savingIndex != null) return;
     setState(() {
       _entries = [_welcomeEntry(_targetLanguage)];
       _error = null;
@@ -133,6 +142,44 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
   }
 
+  Future<void> _saveLearningEntry(int index) async {
+    if (_savingIndex != null) return;
+
+    final entry = _entries[index];
+    final reply = entry.reply;
+    if (reply == null) return;
+
+    final text = reply.hasCorrection ? reply.correction : reply.reply;
+    if (text.trim().isEmpty) return;
+
+    setState(() => _savingIndex = index);
+
+    try {
+      final added = await widget.onSaveLearning(text);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            added
+                ? '已變成鎏金學習卡並加入收藏 ✨'
+                : '這個句子已經收藏過了。',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _savingIndex = null);
+      }
+    }
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
@@ -163,7 +210,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 ),
                 IconButton(
                   tooltip: '清除對話',
-                  onPressed: _isSending ? null : _clearConversation,
+                  onPressed:
+                      _isSending || _savingIndex != null ? null : _clearConversation,
                   icon: const Icon(Icons.refresh_rounded),
                 ),
               ],
@@ -197,7 +245,13 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   return const _ThinkingBubble();
                 }
                 final entry = _entries[index];
-                return _ConversationEntry(entry: entry);
+                return _ConversationEntry(
+                  entry: entry,
+                  isSaving: _savingIndex == index,
+                  onSave: entry.reply == null
+                      ? null
+                      : () => _saveLearningEntry(index),
+                );
               },
             ),
           ),
@@ -227,7 +281,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             child: TextField(
               controller: _controller,
-              enabled: !_isSending,
+              enabled: !_isSending && _savingIndex == null,
               minLines: 1,
               maxLines: 4,
               textInputAction: TextInputAction.send,
@@ -242,7 +296,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 ),
                 suffixIcon: IconButton(
                   tooltip: '送出',
-                  onPressed: _isSending ? null : _sendMessage,
+                  onPressed:
+                      _isSending || _savingIndex != null ? null : _sendMessage,
                   icon: _isSending
                       ? const SizedBox(
                           width: 20,
@@ -274,9 +329,13 @@ class _ChatEntry {
 
 class _ConversationEntry extends StatelessWidget {
   final _ChatEntry entry;
+  final bool isSaving;
+  final VoidCallback? onSave;
 
   const _ConversationEntry({
     required this.entry,
+    required this.isSaving,
+    required this.onSave,
   });
 
   @override
@@ -344,6 +403,29 @@ class _ConversationEntry extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     SelectableText(reply.translation),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton.tonalIcon(
+                        key: const ValueKey('save-chat-learning-card'),
+                        onPressed: isSaving ? null : onSave,
+                        icon: isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const GildedCardIcon(
+                                width: 20,
+                                height: 26,
+                              ),
+                        label: Text(
+                          isSaving ? '建立學習卡中...' : '加入我的學習',
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
