@@ -8,6 +8,7 @@ import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/review_screen.dart';
 import 'screens/saved_screen.dart';
+import 'services/language_analysis_service.dart';
 import 'services/learning_store.dart';
 
 void main() {
@@ -41,6 +42,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   final _learningStore = LearningStore();
+  final _analysisService = LanguageAnalysisService();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
@@ -223,6 +225,7 @@ class _MainShellState extends State<MainShell> {
         onStartReview: _startReview,
       ),
       LearnScreen(
+        onAnalyze: _analysisService.analyze,
         onSave: _saveLearningItem,
         onSaved: _openSavedItems,
       ),
