@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguamate/main.dart';
+import 'package:linguamate/models/language_analysis.dart';
 import 'package:linguamate/models/learning_item.dart';
 import 'package:linguamate/screens/home_screen.dart';
+import 'package:linguamate/screens/learn_screen.dart';
 import 'package:linguamate/screens/review_screen.dart';
 import 'package:linguamate/screens/saved_screen.dart';
 import 'package:linguamate/services/backup_codec.dart';
@@ -21,6 +23,53 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('LinguaMate'), findsOneWidget);
+  });
+
+  testWidgets('LearnScreen renders dynamic three-language AI analysis',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: LearnScreen(
+            onAnalyze: (text) async => const LanguageAnalysis(
+              detectedLanguage: 'English',
+              chinese: '我晚點回覆你。',
+              english: 'I will reply to you later.',
+              tagalog: 'Babalikan kita mamaya.',
+              tone: '自然、日常，適合一般聊天。',
+              learningPoints: [
+                LearningPoint(
+                  title: 'reply',
+                  explanation: '作為動詞表示「回覆」。',
+                ),
+                LearningPoint(
+                  title: 'mamaya',
+                  explanation: 'Tagalog 常見的「稍後、等一下」。',
+                ),
+              ],
+            ),
+            onSave: (_) async => true,
+            onSaved: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('我晚點回覆你。'), findsNothing);
+
+    await tester.tap(find.widgetWithText(FilledButton, '分析並學習'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('偵測語言：English'), findsOneWidget);
+    expect(find.text('🇹🇼 中文'), findsOneWidget);
+    expect(find.text('我晚點回覆你。'), findsOneWidget);
+    expect(find.text('🇺🇸 English'), findsOneWidget);
+    expect(find.text('I will reply to you later.'), findsAtLeastNWidgets(1));
+    expect(find.text('🇵🇭 Tagalog / Taglish'), findsOneWidget);
+    expect(find.text('Babalikan kita mamaya.'), findsOneWidget);
+    expect(find.text('✨ 學習重點'), findsOneWidget);
+    expect(find.text('reply'), findsOneWidget);
+    expect(find.text('mamaya'), findsOneWidget);
   });
 
   testWidgets('HomeScreen shows real due-review state', (tester) async {
