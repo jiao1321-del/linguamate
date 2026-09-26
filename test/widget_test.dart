@@ -18,6 +18,7 @@ import 'package:linguamate/services/backup_codec.dart';
 import 'package:linguamate/services/learning_store.dart';
 import 'package:linguamate/widgets/gilded_card_icon.dart';
 import 'package:linguamate/widgets/shili_coach_avatar.dart';
+import 'package:linguamate/widgets/shili_coach_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -223,6 +224,23 @@ void main() {
     expect(find.widgetWithText(ChoiceChip, '日常生活'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '工作職場'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '旅行'), findsOneWidget);
+
+    final coachPanel = find.byType(ShiliCoachHeader);
+    expect(coachPanel, findsOneWidget);
+    expect(
+      find.descendant(
+        of: coachPanel,
+        matching: find.widgetWithText(ChoiceChip, 'English'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: coachPanel,
+        matching: find.widgetWithText(ChoiceChip, '工作職場'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.widgetWithText(ChoiceChip, '工作職場'));
     await tester.pumpAndSettle();

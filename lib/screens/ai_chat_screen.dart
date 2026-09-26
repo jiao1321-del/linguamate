@@ -365,48 +365,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
               ],
             ),
           ),
-          ShiliCoachHeader(targetLanguage: _targetLanguage),
-          SizedBox(
-            height: 42,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              scrollDirection: Axis.horizontal,
-              itemCount: _targets.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final language = _targets[index];
-                return ChoiceChip(
-                  label: Text(language),
-                  selected: _targetLanguage == language,
-                  onSelected: _isRestoring
-                      ? null
-                      : (_) => _changeTarget(language),
-                );
-              },
-            ),
+          ShiliCoachHeader(
+            targetLanguage: _targetLanguage,
+            scenario: _scenario,
+            languages: _targets,
+            scenarios: _scenarios,
+            enabled:
+                !_isRestoring && !_isSending && _savingIndex == null,
+            onLanguageSelected: _changeTarget,
+            onScenarioSelected: _changeScenario,
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 38,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              scrollDirection: Axis.horizontal,
-              itemCount: _scenarios.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final scenario = _scenarios[index];
-                return ChoiceChip(
-                  key: ValueKey('scenario-$scenario'),
-                  label: Text(scenario),
-                  selected: _scenario == scenario,
-                  onSelected: _isRestoring || _isSending || _savingIndex != null
-                      ? null
-                      : (_) => _changeScenario(scenario),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
