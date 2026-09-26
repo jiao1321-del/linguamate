@@ -322,7 +322,7 @@ void main() {
     final field = find.byKey(const ValueKey('chat-input'));
     await tester.enterText(field, 'Can you help me check this issue?');
     await tester.showKeyboard(field);
-    tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pumpAndSettle();
 
     expect(sentMessage, 'Can you help me check this issue?');
