@@ -65,8 +65,24 @@ void main() {
     expect(find.text('我晚點回覆你。'), findsOneWidget);
     expect(find.text('🇺🇸 English'), findsOneWidget);
     expect(find.text('I will reply to you later.'), findsAtLeastNWidgets(1));
+
+    await tester.scrollUntilVisible(
+      find.text('🇵🇭 Tagalog / Taglish'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('🇵🇭 Tagalog / Taglish'), findsOneWidget);
     expect(find.text('Babalikan kita mamaya.'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('✨ 學習重點'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('✨ 學習重點'), findsOneWidget);
     expect(find.text('reply'), findsOneWidget);
     expect(find.text('mamaya'), findsOneWidget);
