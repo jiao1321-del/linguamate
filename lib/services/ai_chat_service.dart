@@ -26,6 +26,7 @@ class AiChatService {
   Future<AiCoachReply> send(
     String message,
     String targetLanguage,
+    String scenario,
     List<Map<String, String>> history,
   ) async {
     final normalized = message.trim();
@@ -51,6 +52,7 @@ class AiChatService {
             body: jsonEncode({
               'message': normalized,
               'targetLanguage': targetLanguage,
+              'scenario': scenario,
               'history': history.takeLast(8).toList(),
             }),
           )

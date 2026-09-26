@@ -12,6 +12,7 @@ import '../widgets/shili_coach_header.dart';
 typedef AiCoachSender = Future<AiCoachReply> Function(
   String message,
   String targetLanguage,
+  String scenario,
   List<Map<String, String>> history,
 );
 
@@ -35,11 +36,18 @@ class AiChatScreen extends StatefulWidget {
 
 class _AiChatScreenState extends State<AiChatScreen> {
   static const _targets = <String>['English', 'Tagalog', 'Taglish'];
+  static const _scenarios = <String>[
+    '自由對話',
+    '日常生活',
+    '工作職場',
+    '旅行',
+  ];
 
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
 
   String _targetLanguage = 'English';
+  String _scenario = '自由對話';
   bool _isRestoring = true;
   bool _isSending = false;
   int? _savingIndex;
@@ -49,7 +57,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   void initState() {
     super.initState();
-    _entries = [_welcomeEntry(_targetLanguage)];
+    _entries = [_welcomeEntry(_targetLanguage, _scenario)];
     _restoreConversation();
   }
 
@@ -60,25 +68,32 @@ class _AiChatScreenState extends State<AiChatScreen> {
     super.dispose();
   }
 
-  AiChatMessage _welcomeEntry(String language) {
+  AiChatMessage _welcomeEntry(String language, String scenario) {
+    final topic = switch (scenario) {
+      '日常生活' => 'daily life',
+      '工作職場' => 'workplace situations',
+      '旅行' => 'travel',
+      _ => 'anything you like',
+    };
+
     switch (language) {
       case 'Tagalog':
-        return const AiChatMessage(
+        return AiChatMessage(
           mine: false,
           text:
-              'Hi, ako si Shili ✨ Mag-practice tayo ng natural na Tagalog. Ano ang gusto mong pag-usapan today?',
+              'Hi, ako si Shili ✨ Mag-practice tayo ng natural na Tagalog tungkol sa $topic. Simulan mo kapag ready ka.',
         );
       case 'Taglish':
-        return const AiChatMessage(
+        return AiChatMessage(
           mine: false,
           text:
-              'Hi, I’m Shili ✨ Let’s practice natural Taglish together. Kumusta ang day mo today?',
+              'Hi, I’m Shili ✨ Let’s practice natural Taglish around $topic. Start ka lang when you’re ready.',
         );
       default:
-        return const AiChatMessage(
+        return AiChatMessage(
           mine: false,
           text:
-              'Hi, I’m Shili ✨ Let’s make your English sound more natural. What do you feel like talking about today?',
+              'Hi, I’m Shili ✨ Let’s practice natural English around $topic. Start whenever you’re ready.',
         );
     }
   }
@@ -90,11 +105,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final language = saved != null && _targets.contains(saved.targetLanguage)
         ? saved.targetLanguage
         : 'English';
+    final scenario = saved != null && _scenarios.contains(saved.scenario)
+        ? saved.scenario
+        : '自由對話';
     final messages = saved?.messages ?? const <AiChatMessage>[];
 
     setState(() {
       _targetLanguage = language;
-      _entries = messages.isEmpty ? [_welcomeEntry(language)] : messages;
+      _scenario = scenario;
+      _entries =
+          messages.isEmpty ? [_welcomeEntry(language, scenario)] : messages;
       _isRestoring = false;
     });
 
@@ -107,6 +127,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return widget.chatStore.save(
       AiChatState(
         targetLanguage: _targetLanguage,
+        scenario: _scenario,
         messages: _entries,
       ),
     );
@@ -150,7 +171,24 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     setState(() {
       _targetLanguage = language;
-      _entries = [_welcomeEntry(language)];
+      _entries = [_welcomeEntry(language, _scenario)];
+      _error = null;
+    });
+    _controller.clear();
+    await _persistConversation();
+  }
+
+  Future<void> _changeScenario(String scenario) async {
+    if (_isRestoring ||
+        _isSending ||
+        _savingIndex != null ||
+        scenario == _scenario) {
+      return;
+    }
+
+    setState(() {
+      _scenario = scenario;
+      _entries = [_welcomeEntry(_targetLanguage, scenario)];
       _error = null;
     });
     _controller.clear();
@@ -161,7 +199,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     if (_isRestoring || _isSending || _savingIndex != null) return;
 
     setState(() {
-      _entries = [_welcomeEntry(_targetLanguage)];
+      _entries = [_welcomeEntry(_targetLanguage, _scenario)];
       _error = null;
     });
     _controller.clear();
@@ -208,6 +246,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       final reply = await widget.onSend(
         message,
         _targetLanguage,
+        _scenario,
         history,
       );
       if (!mounted) return;
@@ -342,6 +381,27 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   onSelected: _isRestoring
                       ? null
                       : (_) => _changeTarget(language),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 38,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              itemCount: _scenarios.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final scenario = _scenarios[index];
+                return ChoiceChip(
+                  key: ValueKey('scenario-$scenario'),
+                  label: Text(scenario),
+                  selected: _scenario == scenario,
+                  onSelected: _isRestoring || _isSending || _savingIndex != null
+                      ? null
+                      : (_) => _changeScenario(scenario),
                 );
               },
             ),

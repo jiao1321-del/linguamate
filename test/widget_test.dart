@@ -185,15 +185,17 @@ void main() {
       (tester) async {
     String? sentMessage;
     String? sentTarget;
+    String? sentScenario;
     String? savedLearningText;
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: AiChatScreen(
-            onSend: (message, targetLanguage, history) async {
+            onSend: (message, targetLanguage, scenario, history) async {
               sentMessage = message;
               sentTarget = targetLanguage;
+              sentScenario = scenario;
               return const AiCoachReply(
                 reply: 'I went to the gym after work. How about you?',
                 correction: 'I went to the gym after work today.',
@@ -217,6 +219,13 @@ void main() {
     expect(find.widgetWithText(ChoiceChip, 'English'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, 'Tagalog'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, 'Taglish'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '自由對話'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '日常生活'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '工作職場'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '旅行'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, '工作職場'));
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.byType(TextField),
@@ -227,6 +236,7 @@ void main() {
 
     expect(sentMessage, 'Today I go gym after work.');
     expect(sentTarget, 'English');
+    expect(sentScenario, '工作職場');
     expect(
       find.text('I went to the gym after work. How about you?'),
       findsOneWidget,
@@ -257,7 +267,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: AiChatScreen(
-            onSend: (message, targetLanguage, history) async {
+            onSend: (message, targetLanguage, scenario, history) async {
               sentMessage = message;
               return const AiCoachReply(
                 reply: 'Got it. What happened on the production line?',
@@ -325,6 +335,7 @@ void main() {
     await store.save(
       const AiChatState(
         targetLanguage: 'Tagalog',
+        scenario: '旅行',
         messages: [
           AiChatMessage(
             mine: true,
@@ -349,7 +360,7 @@ void main() {
         home: Scaffold(
           body: AiChatScreen(
             chatStore: store,
-            onSend: (_, __, ___) async => const AiCoachReply(
+            onSend: (_, __, ___, ____) async => const AiCoachReply(
               reply: 'Sige!',
               correction: '',
               explanation: '自然回覆。',
@@ -366,6 +377,10 @@ void main() {
       find.widgetWithText(ChoiceChip, 'Tagalog'),
     );
     expect(tagalogChip.selected, isTrue);
+    final travelChip = tester.widget<ChoiceChip>(
+      find.widgetWithText(ChoiceChip, '旅行'),
+    );
+    expect(travelChip.selected, isTrue);
     expect(
       find.text('Magpahinga ka muna. Kumain ka na ba?'),
       findsOneWidget,
@@ -377,6 +392,7 @@ void main() {
     const store = AiChatStore();
     const state = AiChatState(
       targetLanguage: 'Taglish',
+      scenario: '日常生活',
       messages: [
         AiChatMessage(
           mine: true,
@@ -399,6 +415,7 @@ void main() {
     final loaded = await store.load();
 
     expect(loaded?.targetLanguage, 'Taglish');
+    expect(loaded?.scenario, '日常生活');
     expect(loaded?.messages, hasLength(2));
     expect(loaded?.messages.last.reply?.translation, '先稍微休息一下。');
 

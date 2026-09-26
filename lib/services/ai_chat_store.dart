@@ -32,6 +32,7 @@ class AiChatStore {
 
     final normalized = AiChatState(
       targetLanguage: state.targetLanguage,
+      scenario: state.scenario,
       messages: messages,
     );
 
