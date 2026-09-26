@@ -52,10 +52,26 @@ void main() {
     expect(find.text('收藏總數'), findsOneWidget);
     expect(find.text('已分類'), findsOneWidget);
     expect(find.text('未分類'), findsOneWidget);
-    expect(find.text('I want to learn Tagalog.'), findsOneWidget);
-    expect(find.text('I like it.'), findsOneWidget);
     expect(find.text('48m'), findsNothing);
     expect(find.text('28'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('I want to learn Tagalog.'),
+      350,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('I want to learn Tagalog.'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('I like it.'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('I like it.'), findsOneWidget);
   });
 
   testWidgets('SavedScreen filters saved sentences by text and category',
