@@ -726,7 +726,7 @@ class _ConversationReviewCard extends StatelessWidget {
               child: FilledButton.tonalIcon(
                 key: ValueKey('review-save-${item.entryIndex}'),
                 onPressed: onSave,
-                icon: const GildedCardIcon(size: 22),
+                icon: const GildedCardIcon(width: 18, height: 24),
                 label: const Text('加入我的學習'),
               ),
             ),
