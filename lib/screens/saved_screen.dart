@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/learning_item.dart';
+import '../widgets/gilded_card_icon.dart';
 import 'learning_card_screen.dart';
 
 class SavedScreen extends StatefulWidget {
@@ -346,12 +347,9 @@ class _SavedScreenState extends State<SavedScreen> {
                               onPressed: () => _chooseCategory(context, item),
                             ),
                             if (item.hasAnalysis)
-                              const Chip(
-                                avatar: Icon(
-                                  Icons.auto_awesome_rounded,
-                                  size: 18,
-                                ),
-                                label: Text('完整學習卡'),
+                              const Tooltip(
+                                message: 'AI 學習卡',
+                                child: GildedCardIcon(),
                               ),
                           ],
                         ),

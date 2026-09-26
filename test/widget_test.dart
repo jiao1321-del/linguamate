@@ -7,10 +7,12 @@ import 'package:linguamate/models/language_analysis.dart';
 import 'package:linguamate/models/learning_item.dart';
 import 'package:linguamate/screens/home_screen.dart';
 import 'package:linguamate/screens/learn_screen.dart';
+import 'package:linguamate/screens/learning_card_screen.dart';
 import 'package:linguamate/screens/review_screen.dart';
 import 'package:linguamate/screens/saved_screen.dart';
 import 'package:linguamate/services/backup_codec.dart';
 import 'package:linguamate/services/learning_store.dart';
+import 'package:linguamate/widgets/gilded_card_icon.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -334,6 +336,74 @@ void main() {
     expect(find.text('1/2 句'), findsOneWidget);
     expect(find.text('I want to learn Tagalog.'), findsNothing);
     expect(find.text('I like it.'), findsOneWidget);
+  });
+
+  testWidgets('SavedScreen uses gilded card icon without text label',
+      (tester) async {
+    final item = LearningItem(
+      id: 'gilded',
+      text: 'I will reply later.',
+      createdAt: DateTime(2026, 9, 27),
+      analysis: const LanguageAnalysis(
+        detectedLanguage: 'English',
+        chinese: '我晚點回覆。',
+        english: 'I will reply later.',
+        tagalog: 'Babalikan kita mamaya.',
+        tone: '自然。',
+        learningPoints: [],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SavedScreen(
+            items: [item],
+            isLoading: false,
+            onDelete: (_) async {},
+            onCategoryChanged: (_, __) async {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(GildedCardIcon), findsOneWidget);
+    expect(find.text('完整學習卡'), findsNothing);
+  });
+
+  testWidgets('LearningCardScreen shows gilded header and copy actions',
+      (tester) async {
+    final item = LearningItem(
+      id: 'card',
+      text: 'I will reply later.',
+      createdAt: DateTime(2026, 9, 27),
+      analysis: const LanguageAnalysis(
+        detectedLanguage: 'English',
+        chinese: '我晚點回覆。',
+        english: 'I will reply later.',
+        tagalog: 'Babalikan kita mamaya.',
+        tone: '自然。',
+        learningPoints: [
+          LearningPoint(
+            title: 'mamaya',
+            explanation: '稍後。',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LearningCardScreen(item: item),
+      ),
+    );
+
+    expect(find.byType(GildedCardIcon), findsNWidgets(2));
+    expect(find.text('完整學習卡'), findsNothing);
+    expect(find.text('快速操作'), findsOneWidget);
+    expect(find.text('複製中文'), findsOneWidget);
+    expect(find.text('複製 English'), findsOneWidget);
+    expect(find.text('複製 Tagalog'), findsOneWidget);
   });
 
   test('LearningItem loads legacy data with default review state', () {

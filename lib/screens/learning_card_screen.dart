@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/learning_item.dart';
+import '../widgets/gilded_card_icon.dart';
 import '../widgets/language_analysis_details.dart';
 
 class LearningCardScreen extends StatelessWidget {
@@ -18,13 +20,35 @@ class LearningCardScreen extends StatelessWidget {
     return '${local.year}/$month/$day';
   }
 
+  Future<void> _copyText(
+    BuildContext context,
+    String label,
+    String text,
+  ) async {
+    final normalized = text.trim();
+    if (normalized.isEmpty) return;
+
+    await Clipboard.setData(ClipboardData(text: normalized));
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已複製$label')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final analysis = item.analysis;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('完整學習卡'),
+        title: const Tooltip(
+          message: 'AI 學習卡',
+          child: GildedCardIcon(
+            width: 24,
+            height: 31,
+          ),
+        ),
       ),
       body: SafeArea(
         top: false,
@@ -64,15 +88,24 @@ class LearningCardScreen extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         Chip(
-                          avatar: const Icon(Icons.label_outline_rounded, size: 18),
+                          avatar: const Icon(
+                            Icons.label_outline_rounded,
+                            size: 18,
+                          ),
                           label: Text(item.category),
                         ),
                         Chip(
-                          avatar: const Icon(Icons.calendar_today_outlined, size: 16),
+                          avatar: const Icon(
+                            Icons.calendar_today_outlined,
+                            size: 16,
+                          ),
                           label: Text(_formatDate(item.createdAt)),
                         ),
                         Chip(
-                          avatar: const Icon(Icons.psychology_alt_outlined, size: 18),
+                          avatar: const Icon(
+                            Icons.psychology_alt_outlined,
+                            size: 18,
+                          ),
                           label: Text(
                             '複習 ${item.reviewCount} 次 · 階段 ${item.reviewLevel}',
                           ),
@@ -84,7 +117,68 @@ class LearningCardScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            if (analysis != null)
+            if (analysis != null) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const GildedCardIcon(
+                            width: 24,
+                            height: 31,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            '快速操作',
+                            style:
+                                Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => _copyText(
+                              context,
+                              '中文',
+                              analysis.chinese,
+                            ),
+                            icon: const Icon(Icons.copy_rounded, size: 18),
+                            label: const Text('複製中文'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => _copyText(
+                              context,
+                              ' English',
+                              analysis.english,
+                            ),
+                            icon: const Icon(Icons.copy_rounded, size: 18),
+                            label: const Text('複製 English'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => _copyText(
+                              context,
+                              ' Tagalog',
+                              analysis.tagalog,
+                            ),
+                            icon: const Icon(Icons.copy_rounded, size: 18),
+                            label: const Text('複製 Tagalog'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -92,8 +186,8 @@ class LearningCardScreen extends StatelessWidget {
                     analysis: analysis,
                   ),
                 ),
-              )
-            else
+              ),
+            ] else
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
