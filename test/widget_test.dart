@@ -22,19 +22,20 @@ void main() {
     expect(find.text('LinguaMate'), findsOneWidget);
   });
 
-  testWidgets('HomeScreen uses real saved data instead of demo values',
-      (tester) async {
+  testWidgets('HomeScreen shows real due-review state', (tester) async {
+    final now = DateTime.now();
     final items = [
       LearningItem(
         id: '1',
         text: 'I want to learn Tagalog.',
-        createdAt: DateTime(2026, 9, 27),
+        createdAt: now,
         category: 'Tagalog',
       ),
       LearningItem(
         id: '2',
         text: 'I like it.',
-        createdAt: DateTime(2026, 9, 26),
+        createdAt: now.subtract(const Duration(days: 1)),
+        nextReviewAt: now.add(const Duration(days: 3)),
       ),
     ];
 
@@ -51,11 +52,12 @@ void main() {
     );
 
     expect(find.text('收藏總數'), findsOneWidget);
-    expect(find.text('已分類'), findsOneWidget);
+    expect(find.text('待複習'), findsOneWidget);
+    expect(find.text('今日新增'), findsOneWidget);
     expect(find.text('未分類'), findsOneWidget);
-    expect(find.text('48m'), findsNothing);
-    expect(find.text('28'), findsNothing);
+    expect(find.text('複習 1 個到期句子'), findsOneWidget);
     expect(find.text('開始今日複習'), findsOneWidget);
+    expect(find.text('48m'), findsNothing);
 
     await tester.scrollUntilVisible(
       find.text('I want to learn Tagalog.'),
@@ -65,19 +67,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('I want to learn Tagalog.'), findsOneWidget);
-
-    await tester.scrollUntilVisible(
-      find.text('I like it.'),
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('I like it.'), findsOneWidget);
   });
 
-  testWidgets('ReviewScreen reveals hints and advances remembered cards',
+  testWidgets('ReviewScreen persists remember result and advances',
       (tester) async {
+    final calls = <String>[];
     final items = [
       LearningItem(
         id: '1',
@@ -95,7 +89,12 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: ReviewScreen(items: items),
+        home: ReviewScreen(
+          items: items,
+          onReviewResult: (id, remembered) async {
+            calls.add('$id:$remembered');
+          },
+        ),
       ),
     );
 
@@ -107,11 +106,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Tagalog'), findsOneWidget);
-    expect(find.text('收藏於 2026/09/27'), findsOneWidget);
+    expect(find.text('已複習 0 次 · 階段 0'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, '記得'));
     await tester.pumpAndSettle();
 
+    expect(calls, contains('1:true'));
     expect(find.text('1 / 2'), findsOneWidget);
     expect(find.text('I like it.'), findsOneWidget);
   });
@@ -171,7 +171,7 @@ void main() {
     expect(find.text('I like it.'), findsOneWidget);
   });
 
-  test('LearningItem loads legacy saved data as uncategorized', () {
+  test('LearningItem loads legacy data with default review state', () {
     final item = LearningItem.fromJson(
       jsonDecode(
         '{"id":"legacy","text":"Old sentence","createdAt":"2026-09-27T00:00:00.000"}',
@@ -179,20 +179,64 @@ void main() {
     );
 
     expect(item.category, LearningItem.uncategorized);
+    expect(item.reviewLevel, 0);
+    expect(item.reviewCount, 0);
+    expect(item.lastReviewedAt, isNull);
+    expect(item.nextReviewAt, isNull);
   });
 
-  test('LearningStore persists category updates and deletion', () async {
+  test('LearningItem schedules 1, 3 days then resets on review again', () {
+    final start = DateTime.utc(2026, 9, 27, 1);
+    final initial = LearningItem(
+      id: 'srs',
+      text: 'Remember me.',
+      createdAt: start,
+    );
+
+    final first = initial.reviewed(
+      remembered: true,
+      now: start,
+    );
+    expect(first.reviewLevel, 1);
+    expect(first.reviewCount, 1);
+    expect(first.nextReviewAt, start.add(const Duration(days: 1)));
+    expect(first.isDue(start), isFalse);
+
+    final secondNow = first.nextReviewAt!;
+    final second = first.reviewed(
+      remembered: true,
+      now: secondNow,
+    );
+    expect(second.reviewLevel, 2);
+    expect(second.reviewCount, 2);
+    expect(second.nextReviewAt, secondNow.add(const Duration(days: 3)));
+
+    final reset = second.reviewed(
+      remembered: false,
+      now: secondNow,
+    );
+    expect(reset.reviewLevel, 0);
+    expect(reset.reviewCount, 3);
+    expect(reset.nextReviewAt, secondNow);
+    expect(reset.isDue(secondNow), isTrue);
+  });
+
+  test('LearningStore persists review progress, category and deletion', () async {
     final store = LearningStore();
+    final now = DateTime.utc(2026, 9, 27, 1);
     final first = LearningItem(
       id: 'test-1',
       text: 'This is my first saved sentence.',
-      createdAt: DateTime(2026, 9, 27),
+      createdAt: now,
     );
     final second = LearningItem(
       id: 'test-2',
       text: 'This sentence should remain.',
-      createdAt: DateTime(2026, 9, 28),
+      createdAt: now.add(const Duration(days: 1)),
       category: '工作',
+    ).reviewed(
+      remembered: true,
+      now: now,
     );
 
     await store.saveItems([first, second]);
@@ -211,5 +255,8 @@ void main() {
     expect(reloaded, hasLength(1));
     expect(reloaded.first.id, second.id);
     expect(reloaded.first.category, '生活');
+    expect(reloaded.first.reviewLevel, 1);
+    expect(reloaded.first.reviewCount, 1);
+    expect(reloaded.first.nextReviewAt, now.add(const Duration(days: 1)));
   });
 }
