@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:linguamate/main.dart';
 import 'package:linguamate/models/learning_item.dart';
 import 'package:linguamate/screens/home_screen.dart';
+import 'package:linguamate/screens/review_screen.dart';
 import 'package:linguamate/screens/saved_screen.dart';
 import 'package:linguamate/services/learning_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -43,7 +44,7 @@ void main() {
           body: HomeScreen(
             items: items,
             isLoading: false,
-            onStartLearning: () {},
+            onStartReview: () {},
           ),
         ),
       ),
@@ -54,6 +55,7 @@ void main() {
     expect(find.text('未分類'), findsOneWidget);
     expect(find.text('48m'), findsNothing);
     expect(find.text('28'), findsNothing);
+    expect(find.text('開始今日複習'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('I want to learn Tagalog.'),
@@ -71,6 +73,46 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('I like it.'), findsOneWidget);
+  });
+
+  testWidgets('ReviewScreen reveals hints and advances remembered cards',
+      (tester) async {
+    final items = [
+      LearningItem(
+        id: '1',
+        text: 'I want to learn Tagalog.',
+        createdAt: DateTime(2026, 9, 27),
+        category: 'Tagalog',
+      ),
+      LearningItem(
+        id: '2',
+        text: 'I like it.',
+        createdAt: DateTime(2026, 9, 26),
+        category: '生活',
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewScreen(items: items),
+      ),
+    );
+
+    expect(find.text('0 / 2'), findsOneWidget);
+    expect(find.text('I want to learn Tagalog.'), findsOneWidget);
+    expect(find.text('點一下卡片查看提示'), findsOneWidget);
+
+    await tester.tap(find.text('I want to learn Tagalog.'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tagalog'), findsOneWidget);
+    expect(find.text('收藏於 2026/09/27'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, '記得'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 / 2'), findsOneWidget);
     expect(find.text('I like it.'), findsOneWidget);
   });
 
