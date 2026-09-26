@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 class LearnScreen extends StatefulWidget {
   final Future<bool> Function(String text) onSave;
+  final VoidCallback onSaved;
 
   const LearnScreen({
     super.key,
     required this.onSave,
+    required this.onSaved,
   });
 
   @override
@@ -49,6 +51,10 @@ class _LearnScreenState extends State<LearnScreen> {
           ),
         ),
       );
+
+      if (added) {
+        widget.onSaved();
+      }
     } catch (_) {
       if (!mounted) return;
 
