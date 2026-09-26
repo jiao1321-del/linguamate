@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/ai_chat_state.dart';
 import '../models/ai_coach_reply.dart';
 import '../services/ai_chat_store.dart';
+import '../services/practice_starter_service.dart';
 import '../widgets/gilded_card_icon.dart';
 import '../widgets/shili_coach_avatar.dart';
 import '../widgets/shili_coach_header.dart';
@@ -195,6 +196,63 @@ class _AiChatScreenState extends State<AiChatScreen> {
     await _persistConversation();
   }
 
+  Future<void> _showStarterIdeas() async {
+    if (_isRestoring || _isSending || _savingIndex != null) return;
+
+    final ideas = PracticeStarterService.ideas(
+      language: _targetLanguage,
+      scenario: _scenario,
+    );
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '話題靈感 · $_scenario',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '點一句放進輸入框，再依你的情況修改。',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF756B82),
+                      ),
+                ),
+                const SizedBox(height: 12),
+                for (final idea in ideas)
+                  ListTile(
+                    key: ValueKey('starter-idea-$idea'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.chat_bubble_outline_rounded),
+                    title: Text(idea),
+                    trailing: const Icon(Icons.north_west_rounded, size: 18),
+                    onTap: () => Navigator.of(context).pop(idea),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selected == null) return;
+
+    _controller.value = TextEditingValue(
+      text: selected,
+      selection: TextSelection.collapsed(offset: selected.length),
+    );
+  }
+
   Future<void> _clearConversation() async {
     if (_isRestoring || _isSending || _savingIndex != null) return;
 
@@ -374,6 +432,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 !_isRestoring && !_isSending && _savingIndex == null,
             onLanguageSelected: _changeTarget,
             onScenarioSelected: _changeScenario,
+            onStarterIdeas: _showStarterIdeas,
           ),
           const SizedBox(height: 4),
           Expanded(
