@@ -9,12 +9,14 @@ class LearnScreen extends StatefulWidget {
     String text,
     LanguageAnalysis analysis,
   ) onSave;
+  final Future<String?> Function()? readClipboardText;
   final VoidCallback onSaved;
 
   const LearnScreen({
     super.key,
     required this.onAnalyze,
     required this.onSave,
+    this.readClipboardText,
     required this.onSaved,
   });
 
@@ -40,10 +42,12 @@ class _LearnScreenState extends State<LearnScreen> {
   }
 
   Future<void> _pasteText() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final rawText = widget.readClipboardText != null
+        ? await widget.readClipboardText!()
+        : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
     if (!mounted) return;
 
-    final text = data?.text?.trim();
+    final text = rawText?.trim();
     if (text == null || text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('剪貼簿目前沒有文字。')),
