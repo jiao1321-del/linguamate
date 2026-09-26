@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguamate/main.dart';
+import 'package:linguamate/models/ai_chat_state.dart';
 import 'package:linguamate/models/ai_coach_reply.dart';
 import 'package:linguamate/models/language_analysis.dart';
 import 'package:linguamate/models/learning_item.dart';
@@ -12,6 +13,7 @@ import 'package:linguamate/screens/learn_screen.dart';
 import 'package:linguamate/screens/learning_card_screen.dart';
 import 'package:linguamate/screens/review_screen.dart';
 import 'package:linguamate/screens/saved_screen.dart';
+import 'package:linguamate/services/ai_chat_store.dart';
 import 'package:linguamate/services/backup_codec.dart';
 import 'package:linguamate/services/learning_store.dart';
 import 'package:linguamate/widgets/gilded_card_icon.dart';
@@ -206,6 +208,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('AI 對話教練'), findsOneWidget);
     expect(find.text('English'), findsOneWidget);
@@ -240,6 +243,93 @@ void main() {
 
     expect(savedLearningText, 'I went to the gym after work today.');
     expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
+  });
+
+  testWidgets('AI chat restores saved conversation and language',
+      (tester) async {
+    const store = AiChatStore();
+    await store.save(
+      const AiChatState(
+        targetLanguage: 'Tagalog',
+        messages: [
+          AiChatMessage(
+            mine: true,
+            text: 'Pagod ako today.',
+          ),
+          AiChatMessage(
+            mine: false,
+            text: 'Magpahinga ka muna. Kumain ka na ba?',
+            reply: AiCoachReply(
+              reply: 'Magpahinga ka muna. Kumain ka na ba?',
+              correction: '',
+              explanation: '「muna」常用來表示「先…一下」。',
+              translation: '你先休息一下。你吃飯了嗎？',
+            ),
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiChatScreen(
+            chatStore: store,
+            onSend: (_, __, ___) async => const AiCoachReply(
+              reply: 'Sige!',
+              correction: '',
+              explanation: '自然回覆。',
+              translation: '好！',
+            ),
+            onSaveLearning: (_) async => true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final tagalogChip = tester.widget<ChoiceChip>(
+      find.widgetWithText(ChoiceChip, 'Tagalog'),
+    );
+    expect(tagalogChip.selected, isTrue);
+    expect(find.text('Pagod ako today.'), findsOneWidget);
+    expect(
+      find.text('Magpahinga ka muna. Kumain ka na ba?'),
+      findsOneWidget,
+    );
+  });
+
+  test('AiChatStore persists and clears conversation state', () async {
+    const store = AiChatStore();
+    const state = AiChatState(
+      targetLanguage: 'Taglish',
+      messages: [
+        AiChatMessage(
+          mine: true,
+          text: 'Busy ako today.',
+        ),
+        AiChatMessage(
+          mine: false,
+          text: 'Take a short break muna.',
+          reply: AiCoachReply(
+            reply: 'Take a short break muna.',
+            correction: '',
+            explanation: '自然的 Taglish 表達。',
+            translation: '先稍微休息一下。',
+          ),
+        ),
+      ],
+    );
+
+    await store.save(state);
+    final loaded = await store.load();
+
+    expect(loaded?.targetLanguage, 'Taglish');
+    expect(loaded?.messages, hasLength(2));
+    expect(loaded?.messages.last.reply?.translation, '先稍微休息一下。');
+
+    await store.clear();
+    expect(await store.load(), isNull);
   });
 
   testWidgets('HomeScreen shows real due-review state', (tester) async {
