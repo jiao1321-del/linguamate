@@ -670,6 +670,7 @@ class _ConversationReviewCard extends StatelessWidget {
     final reply = item.reply;
 
     return Card(
+      key: ValueKey('conversation-review-card-${item.entryIndex}'),
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(14),
