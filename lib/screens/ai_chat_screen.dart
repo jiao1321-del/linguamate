@@ -1,7 +1,148 @@
 import 'package:flutter/material.dart';
 
-class AiChatScreen extends StatelessWidget {
-  const AiChatScreen({super.key});
+import '../models/ai_coach_reply.dart';
+
+typedef AiCoachSender = Future<AiCoachReply> Function(
+  String message,
+  String targetLanguage,
+  List<Map<String, String>> history,
+);
+
+class AiChatScreen extends StatefulWidget {
+  final AiCoachSender onSend;
+
+  const AiChatScreen({
+    super.key,
+    required this.onSend,
+  });
+
+  @override
+  State<AiChatScreen> createState() => _AiChatScreenState();
+}
+
+class _AiChatScreenState extends State<AiChatScreen> {
+  static const _targets = <String>['English', 'Tagalog', 'Taglish'];
+
+  final _controller = TextEditingController();
+  final _scrollController = ScrollController();
+
+  String _targetLanguage = 'English';
+  bool _isSending = false;
+  String? _error;
+  late List<_ChatEntry> _entries;
+
+  @override
+  void initState() {
+    super.initState();
+    _entries = [_welcomeEntry(_targetLanguage)];
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  _ChatEntry _welcomeEntry(String language) {
+    switch (language) {
+      case 'Tagalog':
+        return const _ChatEntry(
+          mine: false,
+          text: 'Kumusta! Mag-practice tayo ng natural na Tagalog. Ano ang ginawa mo ngayon?',
+        );
+      case 'Taglish':
+        return const _ChatEntry(
+          mine: false,
+          text: 'Hi! Let’s practice natural Taglish. Kumusta ang day mo today?',
+        );
+      default:
+        return const _ChatEntry(
+          mine: false,
+          text: 'Hi! Let’s practice natural English. What did you do today?',
+        );
+    }
+  }
+
+  void _changeTarget(String language) {
+    if (_isSending || language == _targetLanguage) return;
+
+    setState(() {
+      _targetLanguage = language;
+      _entries = [_welcomeEntry(language)];
+      _error = null;
+    });
+    _controller.clear();
+  }
+
+  void _clearConversation() {
+    if (_isSending) return;
+    setState(() {
+      _entries = [_welcomeEntry(_targetLanguage)];
+      _error = null;
+    });
+    _controller.clear();
+  }
+
+  Future<void> _sendMessage() async {
+    final message = _controller.text.trim();
+    if (message.isEmpty || _isSending) return;
+
+    final history = _entries
+        .map(
+          (entry) => {
+            'role': entry.mine ? 'user' : 'assistant',
+            'content': entry.reply?.reply ?? entry.text,
+          },
+        )
+        .toList(growable: false);
+
+    setState(() {
+      _entries.add(_ChatEntry(mine: true, text: message));
+      _controller.clear();
+      _isSending = true;
+      _error = null;
+    });
+    _scrollToBottom();
+
+    try {
+      final reply = await widget.onSend(
+        message,
+        _targetLanguage,
+        history,
+      );
+      if (!mounted) return;
+
+      setState(() {
+        _entries.add(
+          _ChatEntry(
+            mine: false,
+            text: reply.reply,
+            reply: reply,
+          ),
+        );
+      });
+      _scrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -9,7 +150,7 @@ class AiChatScreen extends StatelessWidget {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 20, 12, 10),
             child: Row(
               children: [
                 Expanded(
@@ -20,38 +161,96 @@ class AiChatScreen extends StatelessWidget {
                         ),
                   ),
                 ),
-                const Chip(label: Text('日常聊天')),
+                IconButton(
+                  tooltip: '清除對話',
+                  onPressed: _isSending ? null : _clearConversation,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
               ],
             ),
           ),
-          Expanded(
-            child: ListView(
+          SizedBox(
+            height: 42,
+            child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: const [
-                _Bubble(
-                  mine: false,
-                  text: 'What did you do after work today?',
-                ),
-                _Bubble(
-                  mine: true,
-                  text: 'Today I go gym after work.',
-                ),
-                _CorrectionCard(),
-              ],
+              scrollDirection: Axis.horizontal,
+              itemCount: _targets.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final language = _targets[index];
+                return ChoiceChip(
+                  label: Text(language),
+                  selected: _targetLanguage == language,
+                  onSelected: (_) => _changeTarget(language),
+                );
+              },
             ),
           ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              itemCount: _entries.length + (_isSending ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (_isSending && index == _entries.length) {
+                  return const _ThinkingBubble();
+                }
+                final entry = _entries[index];
+                return _ConversationEntry(entry: entry);
+              },
+            ),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Material(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.error_outline_rounded,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_error!)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             child: TextField(
+              controller: _controller,
+              enabled: !_isSending,
+              minLines: 1,
+              maxLines: 4,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sendMessage(),
               decoration: InputDecoration(
-                hintText: '用英文回答...',
+                hintText: '用 $_targetLanguage 練習...',
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
                   borderSide: BorderSide.none,
                 ),
-                suffixIcon: const Icon(Icons.send_rounded),
+                suffixIcon: IconButton(
+                  tooltip: '送出',
+                  onPressed: _isSending ? null : _sendMessage,
+                  icon: _isSending
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send_rounded),
+                ),
               ),
             ),
           ),
@@ -61,61 +260,124 @@ class AiChatScreen extends StatelessWidget {
   }
 }
 
-class _Bubble extends StatelessWidget {
+class _ChatEntry {
   final bool mine;
   final String text;
+  final AiCoachReply? reply;
 
-  const _Bubble({
+  const _ChatEntry({
     required this.mine,
     required this.text,
+    this.reply,
+  });
+}
+
+class _ConversationEntry extends StatelessWidget {
+  final _ChatEntry entry;
+
+  const _ConversationEntry({
+    required this.entry,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 300),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
+    final reply = entry.reply;
+
+    return Column(
+      crossAxisAlignment:
+          entry.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment:
+              entry.mine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            decoration: BoxDecoration(
+              color: entry.mine
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: SelectableText(entry.text),
+          ),
         ),
-        decoration: BoxDecoration(
-          color: mine
-              ? Theme.of(context).colorScheme.primaryContainer
-              : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Text(text),
-      ),
+        if (reply != null)
+          Container(
+            constraints: const BoxConstraints(maxWidth: 340),
+            margin: const EdgeInsets.only(bottom: 14),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (reply.hasCorrection) ...[
+                      Text(
+                        '✨ 更自然的說法',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      SelectableText(reply.correction),
+                      const SizedBox(height: 12),
+                    ],
+                    Text(
+                      '💡 學習提示',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(reply.explanation),
+                    const SizedBox(height: 12),
+                    Text(
+                      '🇹🇼 中文意思',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    SelectableText(reply.translation),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
 
-class _CorrectionCard extends StatelessWidget {
-  const _CorrectionCard();
+class _ThinkingBubble extends StatelessWidget {
+  const _ThinkingBubble();
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '✨ 更自然的說法',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            const SizedBox(height: 8),
-            const Text('I went to the gym after work today.'),
-            const SizedBox(height: 10),
-            const Text(
-              '因為是在描述今天已經發生的事情，所以 go 要改成過去式 went。',
-            ),
+            SizedBox(width: 10),
+            Text('AI 思考中...'),
           ],
         ),
       ),

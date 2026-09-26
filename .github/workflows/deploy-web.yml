@@ -43,32 +43,35 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Smoke test AI analysis endpoint
-        if: github.event_name == 'pull_request' && github.event.pull_request.number == 17
+      - name: Smoke test AI chat endpoint
+        if: github.event_name == 'pull_request' && github.head_ref == 'v1.3-ai-chat-coach'
         run: |
-          curl --fail-with-body --silent --show-error             --request POST             'https://svzsynadhzvflauxppwn.supabase.co/functions/v1/analyze-language'             --header 'Content-Type: application/json'             --header 'apikey: sb_publishable_UoxuXbXG8Qvy0Snte4jmPQ_IIPI-IzR'             --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2enN5bmFkaHp2ZmxhdXhwcHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0NDIxNjIsImV4cCI6MjEwNjAxODE2Mn0.zhl-nd806Gs_VGmNg70UEKEWwck-Iielnb6JCD8sRjI'             --data '{"text":"I will reply to you later."}'             --output /tmp/linguamate-ai-smoke.json
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            'https://svzsynadhzvflauxppwn.supabase.co/functions/v1/chat-language' \
+            --header 'Content-Type: application/json' \
+            --header 'apikey: sb_publishable_UoxuXbXG8Qvy0Snte4jmPQ_IIPI-IzR' \
+            --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2enN5bmFkaHp2ZmxhdXhwcHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0NDIxNjIsImV4cCI6MjEwNjAxODE2Mn0.zhl-nd806Gs_VGmNg70UEKEWwck-Iielnb6JCD8sRjI' \
+            --data '{"message":"Today I go gym after work.","targetLanguage":"English","history":[]}' \
+            --output /tmp/linguamate-chat-smoke.json
 
           python3 - <<'PY'
           import json
 
-          with open('/tmp/linguamate-ai-smoke.json', encoding='utf-8') as f:
+          with open('/tmp/linguamate-chat-smoke.json', encoding='utf-8') as f:
               payload = json.load(f)
 
-          analysis = payload.get('analysis')
-          assert isinstance(analysis, dict), payload
+          reply = payload.get('reply')
+          assert isinstance(reply, dict), payload
 
-          for field in ('chinese', 'english', 'tagalog', 'tone'):
-              value = analysis.get(field)
-              assert isinstance(value, str) and value.strip(), (field, payload)
+          for field in ('reply', 'correction', 'explanation', 'translation'):
+              value = reply.get(field)
+              assert isinstance(value, str), (field, payload)
 
-          points = analysis.get('learningPoints')
-          assert isinstance(points, list) and len(points) >= 2, payload
-
-          print('LinguaMate AI smoke test passed')
-          print('Chinese:', analysis['chinese'])
-          print('English:', analysis['english'])
-          print('Tagalog:', analysis['tagalog'])
-          print('Learning points:', len(points))
+          assert reply['reply'].strip(), payload
+          assert reply['translation'].strip(), payload
+          print('LinguaMate AI chat smoke test passed')
+          print('Reply:', reply['reply'])
           PY
 
       - name: Build Web

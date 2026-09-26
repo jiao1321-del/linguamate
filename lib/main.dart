@@ -9,6 +9,7 @@ import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/review_screen.dart';
 import 'screens/saved_screen.dart';
+import 'services/ai_chat_service.dart';
 import 'services/language_analysis_service.dart';
 import 'services/learning_store.dart';
 
@@ -44,6 +45,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   final _learningStore = LearningStore();
   final _analysisService = LanguageAnalysisService();
+  final _aiChatService = AiChatService();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
@@ -234,7 +236,7 @@ class _MainShellState extends State<MainShell> {
         onSave: _saveLearningItem,
         onSaved: _openSavedItems,
       ),
-      const AiChatScreen(),
+      AiChatScreen(onSend: _aiChatService.send),
       SavedScreen(
         items: _savedItems,
         isLoading: _isLoadingSavedItems,
