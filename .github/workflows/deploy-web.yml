@@ -46,6 +46,11 @@ jobs:
       - name: Build Web
         run: flutter build web --release --base-href "/linguamate/" --pwa-strategy=none
 
+      - name: Version web assets
+        run: |
+          sed -i "s|src=\"flutter_bootstrap.js\"|src=\"flutter_bootstrap.js?v=${GITHUB_SHA}\"|" build/web/index.html
+          sed -i "s|\"mainJsPath\":\"main.dart.js\"|\"mainJsPath\":\"main.dart.js?v=${GITHUB_SHA}\"|" build/web/flutter_bootstrap.js
+
       - name: Finalize Pages files
         run: |
           cat > build/web/flutter_service_worker.js <<'EOF'
