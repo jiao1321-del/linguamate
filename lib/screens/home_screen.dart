@@ -1,12 +1,49 @@
 import 'package:flutter/material.dart';
 
+import '../models/learning_item.dart';
 import '../widgets/stat_card.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final List<LearningItem> items;
+  final bool isLoading;
+  final VoidCallback onStartLearning;
+
+  const HomeScreen({
+    super.key,
+    required this.items,
+    required this.isLoading,
+    required this.onStartLearning,
+  });
+
+  int get _todayCount {
+    final now = DateTime.now();
+    return items.where((item) {
+      final date = item.createdAt.toLocal();
+      return date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day;
+    }).length;
+  }
+
+  int get _categorizedCount => items
+      .where((item) => item.category != LearningItem.uncategorized)
+      .length;
+
+  int get _uncategorizedCount => items.length - _categorizedCount;
+
+  String _value(int value) => isLoading ? '—' : value.toString();
+
+  String _formatDate(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '${local.year}/$month/$day';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final recentItems = items.take(3).toList(growable: false);
+
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
@@ -20,34 +57,34 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 6),
           const Text('今天也學一點真正用得到的語言 ✨'),
           const SizedBox(height: 24),
-          const Row(
+          Row(
             children: [
               StatCard(
-                label: '今日新句子',
-                value: '5',
-                icon: Icons.add_circle_outline,
+                label: '收藏總數',
+                value: _value(items.length),
+                icon: Icons.bookmark_outline_rounded,
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               StatCard(
-                label: '待複習',
-                value: '12',
-                icon: Icons.history,
+                label: '今日新增',
+                value: _value(_todayCount),
+                icon: Icons.add_circle_outline,
               ),
             ],
           ),
           const SizedBox(height: 12),
-          const Row(
+          Row(
             children: [
               StatCard(
-                label: '連續學習',
-                value: '3 天',
-                icon: Icons.local_fire_department_outlined,
+                label: '已分類',
+                value: _value(_categorizedCount),
+                icon: Icons.label_outline_rounded,
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               StatCard(
-                label: '本週時間',
-                value: '48m',
-                icon: Icons.timer_outlined,
+                label: '未分類',
+                value: _value(_uncategorizedCount),
+                icon: Icons.inbox_outlined,
               ),
             ],
           ),
@@ -68,20 +105,28 @@ class HomeScreen extends StatelessWidget {
                   const ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: CircleAvatar(child: Text('1')),
-                    title: Text('複習 10 個收藏句子'),
-                    subtitle: Text('約 5 分鐘'),
+                    title: Text('新增 1 個今天真的會用到的句子'),
+                    subtitle: Text('把工作或生活中的句子放進 LinguaMate'),
                   ),
-                  const ListTile(
+                  ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(child: Text('2')),
-                    title: Text('完成 1 次 AI 對話'),
-                    subtitle: Text('日常聊天情境'),
+                    leading: const CircleAvatar(child: Text('2')),
+                    title: Text(
+                      _uncategorizedCount > 0
+                          ? '整理 $_uncategorizedCount 個未分類收藏'
+                          : '收藏分類已整理完成',
+                    ),
+                    subtitle: Text(
+                      _uncategorizedCount > 0
+                          ? '幫句子加上工作、生活或語言分類'
+                          : '今天可以專心新增或複習句子',
+                    ),
                   ),
                   const SizedBox(height: 10),
                   FilledButton.icon(
-                    onPressed: null,
-                    icon: Icon(Icons.play_arrow_rounded),
-                    label: Text('開始今日學習'),
+                    onPressed: onStartLearning,
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('開始今日學習'),
                   ),
                 ],
               ),
@@ -89,23 +134,53 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Text(
-            '最近學習',
+            '最近收藏',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
           ),
           const SizedBox(height: 12),
-          const _SentenceCard(
-            source: 'I will reply to you later.',
-            translation: '我晚點回覆你。',
-            language: 'English',
-          ),
-          const SizedBox(height: 10),
-          const _SentenceCard(
-            source: 'Gagamitin ko ito sa studies ko.',
-            translation: '我會把它用在學業上。',
-            language: 'Tagalog',
-          ),
+          if (isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(28),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (recentItems.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.menu_book_outlined,
+                      size: 42,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      '還沒有收藏句子',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      '從「學習」頁加入第一句，首頁就會顯示你的真實學習紀錄。',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            for (final item in recentItems) ...[
+              _SentenceCard(
+                source: item.text,
+                category: item.category,
+                date: _formatDate(item.createdAt),
+              ),
+              const SizedBox(height: 10),
+            ],
         ],
       ),
     );
@@ -114,13 +189,13 @@ class HomeScreen extends StatelessWidget {
 
 class _SentenceCard extends StatelessWidget {
   final String source;
-  final String translation;
-  final String language;
+  final String category;
+  final String date;
 
   const _SentenceCard({
     required this.source,
-    required this.translation,
-    required this.language,
+    required this.category,
+    required this.date,
   });
 
   @override
@@ -137,9 +212,9 @@ class _SentenceCard extends StatelessWidget {
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text(translation),
+          child: Text('收藏於 $date'),
         ),
-        trailing: Chip(label: Text(language)),
+        trailing: Chip(label: Text(category)),
       ),
     );
   }
