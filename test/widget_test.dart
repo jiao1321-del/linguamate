@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguamate/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,7 +23,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(
-      find.byType(EditableText),
+      find.byType(TextField),
       'This is my saved sentence.',
     );
     await tester.tap(find.text('加入我的學習'));
