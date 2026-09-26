@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguamate/main.dart';
 import 'package:linguamate/models/learning_item.dart';
+import 'package:linguamate/screens/home_screen.dart';
 import 'package:linguamate/screens/saved_screen.dart';
 import 'package:linguamate/services/learning_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,6 +19,59 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('LinguaMate'), findsOneWidget);
+  });
+
+  testWidgets('HomeScreen uses real saved data instead of demo values',
+      (tester) async {
+    final items = [
+      LearningItem(
+        id: '1',
+        text: 'I want to learn Tagalog.',
+        createdAt: DateTime(2026, 9, 27),
+        category: 'Tagalog',
+      ),
+      LearningItem(
+        id: '2',
+        text: 'I like it.',
+        createdAt: DateTime(2026, 9, 26),
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomeScreen(
+            items: items,
+            isLoading: false,
+            onStartLearning: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('收藏總數'), findsOneWidget);
+    expect(find.text('已分類'), findsOneWidget);
+    expect(find.text('未分類'), findsOneWidget);
+    expect(find.text('48m'), findsNothing);
+    expect(find.text('28'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('I want to learn Tagalog.'),
+      350,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('I want to learn Tagalog.'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('I like it.'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('I like it.'), findsOneWidget);
   });
 
   testWidgets('SavedScreen filters saved sentences by text and category',

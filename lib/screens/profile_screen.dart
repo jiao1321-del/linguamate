@@ -1,7 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../models/learning_item.dart';
+
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  final List<LearningItem> items;
+  final bool isLoading;
+
+  const ProfileScreen({
+    super.key,
+    required this.items,
+    required this.isLoading,
+  });
+
+  int get _categorizedCount => items
+      .where((item) => item.category != LearningItem.uncategorized)
+      .length;
+
+  int get _uncategorizedCount => items.length - _categorizedCount;
+
+  String _value(int value) => isLoading ? '—' : value.toString();
 
   @override
   Widget build(BuildContext context) {
@@ -31,27 +48,57 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          const Card(
+          Card(
             child: Column(
               children: [
                 ListTile(
-                  leading: Icon(Icons.local_fire_department_outlined),
-                  title: Text('連續學習'),
-                  trailing: Text('3 天'),
+                  leading: const Icon(Icons.bookmark_outline_rounded),
+                  title: const Text('已收藏句子'),
+                  trailing: Text(
+                    _value(items.length),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
-                Divider(height: 1),
+                const Divider(height: 1),
                 ListTile(
-                  leading: Icon(Icons.book_outlined),
-                  title: Text('已收藏句子'),
-                  trailing: Text('28'),
+                  leading: const Icon(Icons.label_outline_rounded),
+                  title: const Text('已分類'),
+                  trailing: Text(
+                    _value(_categorizedCount),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
-                Divider(height: 1),
+                const Divider(height: 1),
                 ListTile(
-                  leading: Icon(Icons.check_circle_outline),
-                  title: Text('已掌握'),
-                  trailing: Text('11'),
+                  leading: const Icon(Icons.inbox_outlined),
+                  title: const Text('未分類'),
+                  trailing: Text(
+                    _value(_uncategorizedCount),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.insights_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      '這裡現在顯示的都是你的真實收藏資料。之後加入複習與學習進度後，這一頁也會跟著變成完整的學習統計。',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

@@ -128,15 +128,21 @@ class _MainShellState extends State<MainShell> {
     });
   }
 
-  void _openSavedItems() {
+  void _openPage(int index) {
     if (!mounted) return;
-    setState(() => _index = 3);
+    setState(() => _index = index);
   }
+
+  void _openSavedItems() => _openPage(3);
 
   @override
   Widget build(BuildContext context) {
     final pages = [
-      const HomeScreen(),
+      HomeScreen(
+        items: _savedItems,
+        isLoading: _isLoadingSavedItems,
+        onStartLearning: () => _openPage(1),
+      ),
       LearnScreen(
         onSave: _saveLearningItem,
         onSaved: _openSavedItems,
@@ -148,7 +154,10 @@ class _MainShellState extends State<MainShell> {
         onDelete: _deleteLearningItem,
         onCategoryChanged: _updateLearningItemCategory,
       ),
-      const ProfileScreen(),
+      ProfileScreen(
+        items: _savedItems,
+        isLoading: _isLoadingSavedItems,
+      ),
     ];
 
     return Scaffold(
@@ -158,9 +167,7 @@ class _MainShellState extends State<MainShell> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (value) {
-          setState(() => _index = value);
-        },
+        onDestinationSelected: _openPage,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
