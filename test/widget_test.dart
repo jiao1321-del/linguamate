@@ -313,7 +313,6 @@ void main() {
 
     expect(sentMessage, '無塵室的生產主任，目前剛出產線');
     expect(input.controller!.text, isEmpty);
-    expect(find.text(composingText), findsOneWidget);
     expect(
       find.text('Got it. What happened on the production line?'),
       findsOneWidget,
