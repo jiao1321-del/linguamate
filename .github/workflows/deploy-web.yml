@@ -48,8 +48,9 @@ jobs:
 
       - name: Version web assets
         run: |
-          sed -i "s|src=\"flutter_bootstrap.js\"|src=\"flutter_bootstrap.js?v=${GITHUB_SHA}\"|" build/web/index.html
           sed -i "s|\"mainJsPath\":\"main.dart.js\"|\"mainJsPath\":\"main.dart.js?v=${GITHUB_SHA}\"|" build/web/flutter_bootstrap.js
+          grep -q "main.dart.js?v=${GITHUB_SHA}" build/web/flutter_bootstrap.js
+          grep -q "flutter_bootstrap.js?fresh=" build/web/index.html
 
       - name: Finalize Pages files
         run: |
