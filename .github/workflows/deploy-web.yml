@@ -46,6 +46,20 @@ jobs:
       - name: Build Web
         run: flutter build web --release --base-href "/linguamate/" --pwa-strategy=none
 
+      - name: Generate PWA icon sizes
+        run: |
+          python3 -m pip install --disable-pip-version-check pillow
+          python3 - <<'PY'
+          from PIL import Image
+
+          source = "build/web/icons/Shili-192-v052.png"
+          image = Image.open(source).convert("RGB")
+          image.resize((512, 512), Image.Resampling.LANCZOS).save(
+              "build/web/icons/Shili-512-v052.png",
+              optimize=True,
+          )
+          PY
+
       - name: Version web assets
         run: |
           sed -i "s|\"mainJsPath\":\"main.dart.js\"|\"mainJsPath\":\"main.dart.js?v=${GITHUB_SHA}\"|" build/web/flutter_bootstrap.js
