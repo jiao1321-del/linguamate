@@ -120,6 +120,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
   }
 
+  void _clearComposerAfterSend(String sentMessage) {
+    _controller.value = TextEditingValue.empty;
+
+    unawaited(
+      Future<void>(() async {
+        for (final delay in const [
+          Duration(milliseconds: 80),
+          Duration(milliseconds: 220),
+        ]) {
+          await Future<void>.delayed(delay);
+          if (!mounted) return;
+
+          if (_controller.text.trim() == sentMessage) {
+            _controller.value = TextEditingValue.empty;
+          }
+        }
+      }),
+    );
+  }
+
   Future<void> _changeTarget(String language) async {
     if (_isRestoring ||
         _isSending ||
@@ -170,14 +190,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
         )
         .toList(growable: false);
 
-    FocusManager.instance.primaryFocus?.unfocus();
-
     setState(() {
       _entries.add(AiChatMessage(mine: true, text: message));
-      _controller.clear();
       _isSending = true;
       _error = null;
     });
+
+    _clearComposerAfterSend(message);
+    FocusManager.instance.primaryFocus?.unfocus();
     _scrollToBottom();
 
     // Persistence is best-effort and runs independently from the network
@@ -252,14 +272,21 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-      );
-    });
+    void jumpOnNextFrame(int remainingFrames) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+
+        _scrollController.jumpTo(
+          _scrollController.position.maxScrollExtent,
+        );
+
+        if (remainingFrames > 1) {
+          jumpOnNextFrame(remainingFrames - 1);
+        }
+      });
+    }
+
+    jumpOnNextFrame(3);
   }
 
   @override
@@ -369,6 +396,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               children: [
                 Expanded(
                   child: TextField(
+                    key: const ValueKey('chat-input'),
                     controller: _controller,
                     enabled:
                         !_isRestoring && !_isSending && _savingIndex == null,

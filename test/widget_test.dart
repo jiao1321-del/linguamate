@@ -296,10 +296,23 @@ void main() {
     // keyboard dismissal can move the button and cancel a normal tap.
     expect(sentMessage, '無塵室的生產主任，目前剛出產線');
 
+    // Reproduce the late IME update seen on iPhone PWA: after sending, WebKit
+    // can briefly restore the composing text into the controller.
+    final input = tester.widget<TextField>(
+      find.byKey(const ValueKey('chat-input')),
+    );
+    input.controller!.value = const TextEditingValue(
+      text: composingText,
+      selection: TextSelection.collapsed(offset: composingText.length),
+      composing: TextRange(start: 14, end: composingText.length),
+    );
+
     await gesture.up();
+    await tester.pump(const Duration(milliseconds: 700));
     await tester.pumpAndSettle();
 
     expect(sentMessage, '無塵室的生產主任，目前剛出產線');
+    expect(input.controller!.text, isEmpty);
     expect(
       find.text('Got it. What happened on the production line?'),
       findsOneWidget,
