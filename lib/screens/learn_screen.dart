@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../models/language_analysis.dart';
+
 class LearnScreen extends StatefulWidget {
+  final Future<LanguageAnalysis> Function(String text) onAnalyze;
   final Future<bool> Function(String text) onSave;
   final VoidCallback onSaved;
 
   const LearnScreen({
     super.key,
+    required this.onAnalyze,
     required this.onSave,
     required this.onSaved,
   });
@@ -19,13 +23,57 @@ class _LearnScreenState extends State<LearnScreen> {
     text: 'I will reply to you later.',
   );
 
-  bool _showResult = true;
+  LanguageAnalysis? _analysis;
+  String? _analysisError;
+  String? _analyzedText;
+  bool _isAnalyzing = false;
   bool _isSaving = false;
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _analyzeCurrentSentence() async {
+    final text = _controller.text.trim();
+
+    if (text.isEmpty) {
+      setState(() {
+        _analysis = null;
+        _analysisError = '請先輸入一句想分析的內容。';
+      });
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _isAnalyzing = true;
+      _analysisError = null;
+    });
+
+    try {
+      final result = await widget.onAnalyze(text);
+      if (!mounted) return;
+
+      setState(() {
+        _analysis = result;
+        _analyzedText = text;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _analysis = null;
+        _analysisError = error.toString();
+        _analyzedText = null;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isAnalyzing = false);
+      }
+    }
   }
 
   Future<void> _saveCurrentSentence() async {
@@ -68,8 +116,39 @@ class _LearnScreenState extends State<LearnScreen> {
     }
   }
 
+  void _handleInputChanged(String value) {
+    final normalized = value.trim();
+
+    if (_analysis != null && normalized != _analyzedText) {
+      setState(() {
+        _analysis = null;
+        _analysisError = null;
+        _analyzedText = null;
+      });
+    }
+  }
+
+  String _languageLabel(String value) {
+    switch (value) {
+      case 'Chinese':
+        return '中文';
+      case 'English':
+        return 'English';
+      case 'Tagalog':
+        return 'Tagalog';
+      case 'Taglish':
+        return 'Taglish';
+      case 'Mixed':
+        return '混合語言';
+      default:
+        return value;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final analysis = _analysis;
+
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
@@ -87,6 +166,7 @@ class _LearnScreenState extends State<LearnScreen> {
             controller: _controller,
             minLines: 5,
             maxLines: 9,
+            onChanged: _handleInputChanged,
             decoration: InputDecoration(
               hintText: '輸入 English / 中文 / Tagalog / Taglish...',
               filled: true,
@@ -99,27 +179,62 @@ class _LearnScreenState extends State<LearnScreen> {
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: () {
-              setState(() => _showResult = true);
-            },
-            icon: const Icon(Icons.auto_awesome),
-            label: const Text('分析並學習'),
+            onPressed: _isAnalyzing ? null : _analyzeCurrentSentence,
+            icon: _isAnalyzing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.auto_awesome),
+            label: Text(_isAnalyzing ? 'AI 分析中...' : '分析並學習'),
           ),
-          if (_showResult) ...[
+          if (_analysisError != null) ...[
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(_analysisError!),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (analysis != null) ...[
             const SizedBox(height: 22),
-            const _LanguageCard(
-              title: '中文',
-              text: '我晚點回覆你。',
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Chip(
+                avatar: const Icon(Icons.translate_rounded, size: 18),
+                label: Text(
+                  '偵測語言：${_languageLabel(analysis.detectedLanguage)}',
+                ),
+              ),
             ),
             const SizedBox(height: 10),
-            const _LanguageCard(
-              title: 'English',
-              text: 'I will reply to you later.',
+            _LanguageCard(
+              title: '🇹🇼 中文',
+              text: analysis.chinese,
             ),
             const SizedBox(height: 10),
-            const _LanguageCard(
-              title: 'Tagalog',
-              text: 'Babalikan kita mamaya.',
+            _LanguageCard(
+              title: '🇺🇸 English',
+              text: analysis.english,
+            ),
+            const SizedBox(height: 10),
+            _LanguageCard(
+              title: '🇵🇭 Tagalog / Taglish',
+              text: analysis.tagalog,
             ),
             const SizedBox(height: 10),
             Card(
@@ -129,17 +244,44 @@ class _LearnScreenState extends State<LearnScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '學習重點',
+                      '💬 語氣與使用情境',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      '• reply = 回覆\n'
-                      '• later = 稍後\n'
-                      '• mamaya = 稍後、等一下',
+                    Text(analysis.tone),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '✨ 學習重點',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
                     ),
+                    const SizedBox(height: 12),
+                    if (analysis.learningPoints.isEmpty)
+                      const Text('這句目前沒有額外的學習重點。')
+                    else
+                      for (var i = 0;
+                          i < analysis.learningPoints.length;
+                          i++) ...[
+                        _LearningPointTile(
+                          index: i + 1,
+                          point: analysis.learningPoints[i],
+                        ),
+                        if (i != analysis.learningPoints.length - 1)
+                          const SizedBox(height: 12),
+                      ],
                   ],
                 ),
               ),
@@ -188,15 +330,61 @@ class _LanguageCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
+            SelectableText(
               text,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
+                    height: 1.4,
                   ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LearningPointTile extends StatelessWidget {
+  final int index;
+  final LearningPoint point;
+
+  const _LearningPointTile({
+    required this.index,
+    required this.point,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 13,
+          child: Text(
+            index.toString(),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                point.title,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              if (point.explanation.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(point.explanation),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
