@@ -110,6 +110,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
+  Future<void> _persistConversationSafely() async {
+    try {
+      await _persistConversation();
+    } catch (_) {
+      // Local persistence must never block sending a chat message.
+    }
+  }
+
   Future<void> _changeTarget(String language) async {
     if (_isRestoring ||
         _isSending ||
@@ -144,8 +152,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Future<void> _sendMessage() async {
+    if (_isRestoring || _isSending || _savingIndex != null) return;
+
+    // On iOS PWA, committing an IME composition can happen only after focus
+    // leaves the text field. Unfocus first, then read the finalized text.
+    FocusManager.instance.primaryFocus?.unfocus();
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
     final message = _controller.text.trim();
-    if (message.isEmpty || _isRestoring || _isSending) return;
+    if (message.isEmpty) return;
 
     final history = _entries
         .map(
@@ -162,8 +177,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _isSending = true;
       _error = null;
     });
-    await _persistConversation();
     _scrollToBottom();
+
+    // Saving chat history is best-effort. A storage issue must not prevent
+    // the actual AI request from being sent.
+    await _persistConversationSafely();
 
     try {
       final reply = await widget.onSend(
@@ -182,7 +200,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ),
         );
       });
-      await _persistConversation();
+      await _persistConversationSafely();
       _scrollToBottom();
     } catch (error) {
       if (!mounted) return;
@@ -345,38 +363,57 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            child: TextField(
-              controller: _controller,
-              enabled: !_isRestoring && !_isSending && _savingIndex == null,
-              minLines: 1,
-              maxLines: 4,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _sendMessage(),
-              decoration: InputDecoration(
-                hintText: _isRestoring
-                    ? '正在載入對話...'
-                    : '用 $_targetLanguage 練習...',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    enabled:
+                        !_isRestoring && !_isSending && _savingIndex == null,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _sendMessage(),
+                    decoration: InputDecoration(
+                      hintText: _isRestoring
+                          ? '正在載入對話...'
+                          : '用 $_targetLanguage 練習...',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
                 ),
-                suffixIcon: IconButton(
-                  tooltip: '送出',
-                  onPressed:
-                      _isRestoring || _isSending || _savingIndex != null
-                          ? null
-                          : _sendMessage,
-                  icon: _isSending
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.send_rounded),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: FilledButton(
+                    key: const ValueKey('send-chat-message'),
+                    style: FilledButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      shape: const CircleBorder(),
+                    ),
+                    onPressed:
+                        _isRestoring || _isSending || _savingIndex != null
+                            ? null
+                            : _sendMessage,
+                    child: _isSending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.send_rounded),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
