@@ -96,11 +96,19 @@ class _MainShellState extends State<MainShell> {
     return true;
   }
 
+  void _openSavedItems() {
+    if (!mounted) return;
+    setState(() => _index = 3);
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
       const HomeScreen(),
-      LearnScreen(onSave: _saveLearningItem),
+      LearnScreen(
+        onSave: _saveLearningItem,
+        onSaved: _openSavedItems,
+      ),
       const AiChatScreen(),
       SavedScreen(
         items: _savedItems,
