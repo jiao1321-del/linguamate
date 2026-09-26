@@ -3,15 +3,25 @@ import 'package:flutter/material.dart';
 import '../models/learning_item.dart';
 
 class SavedScreen extends StatefulWidget {
+  static const categories = <String>[
+    LearningItem.uncategorized,
+    '工作',
+    '生活',
+    'English',
+    'Tagalog',
+  ];
+
   final List<LearningItem> items;
   final bool isLoading;
   final Future<void> Function(String id) onDelete;
+  final Future<void> Function(String id, String category) onCategoryChanged;
 
   const SavedScreen({
     super.key,
     required this.items,
     required this.isLoading,
     required this.onDelete,
+    required this.onCategoryChanged,
   });
 
   @override
@@ -19,8 +29,11 @@ class SavedScreen extends StatefulWidget {
 }
 
 class _SavedScreenState extends State<SavedScreen> {
+  static const _allCategory = '全部';
+
   final _searchController = TextEditingController();
   String _query = '';
+  String _selectedCategory = _allCategory;
 
   @override
   void dispose() {
@@ -37,16 +50,62 @@ class _SavedScreenState extends State<SavedScreen> {
 
   List<LearningItem> get _filteredItems {
     final query = _query.trim().toLowerCase();
-    if (query.isEmpty) return widget.items;
 
-    return widget.items
-        .where((item) => item.text.toLowerCase().contains(query))
-        .toList(growable: false);
+    return widget.items.where((item) {
+      final matchesCategory = _selectedCategory == _allCategory ||
+          item.category == _selectedCategory;
+      final matchesQuery = query.isEmpty ||
+          item.text.toLowerCase().contains(query) ||
+          item.category.toLowerCase().contains(query);
+      return matchesCategory && matchesQuery;
+    }).toList(growable: false);
   }
 
   void _clearSearch() {
     _searchController.clear();
     setState(() => _query = '');
+  }
+
+  Future<void> _chooseCategory(
+    BuildContext context,
+    LearningItem item,
+  ) async {
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return SimpleDialog(
+          title: const Text('選擇分類'),
+          children: [
+            for (final category in SavedScreen.categories)
+              SimpleDialogOption(
+                onPressed: () => Navigator.of(dialogContext).pop(category),
+                child: Row(
+                  children: [
+                    Icon(
+                      item.category == category
+                          ? Icons.check_circle_rounded
+                          : Icons.label_outline_rounded,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(category),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+
+    if (selected == null || selected == item.category || !context.mounted) {
+      return;
+    }
+
+    await widget.onCategoryChanged(item.id, selected);
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已分類為「$selected」。')),
+    );
   }
 
   Future<void> _confirmDelete(
@@ -89,6 +148,7 @@ class _SavedScreenState extends State<SavedScreen> {
   Widget build(BuildContext context) {
     final filteredItems = _filteredItems;
     final hasQuery = _query.trim().isNotEmpty;
+    final hasFilter = _selectedCategory != _allCategory;
 
     return SafeArea(
       child: ListView(
@@ -108,7 +168,7 @@ class _SavedScreenState extends State<SavedScreen> {
                 Chip(
                   avatar: const Icon(Icons.bookmark_rounded, size: 18),
                   label: Text(
-                    hasQuery
+                    hasQuery || hasFilter
                         ? '${filteredItems.length}/${widget.items.length} 句'
                         : '${widget.items.length} 句',
                   ),
@@ -139,6 +199,27 @@ class _SavedScreenState extends State<SavedScreen> {
                   borderRadius: BorderRadius.circular(18),
                   borderSide: BorderSide.none,
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final category in [
+                    _allCategory,
+                    ...SavedScreen.categories,
+                  ]) ...[
+                    FilterChip(
+                      label: Text(category),
+                      selected: _selectedCategory == category,
+                      onSelected: (_) {
+                        setState(() => _selectedCategory = category);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ],
               ),
             ),
             const SizedBox(height: 18),
@@ -201,7 +282,9 @@ class _SavedScreenState extends State<SavedScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '沒有找到「${_query.trim()}」，換個關鍵字試試看。',
+                      hasQuery
+                          ? '沒有找到「${_query.trim()}」，換個關鍵字或分類試試看。'
+                          : '這個分類目前還沒有收藏句子。',
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -225,7 +308,18 @@ class _SavedScreenState extends State<SavedScreen> {
                   ),
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 7),
-                    child: Text('收藏於 ${_formatDate(item.createdAt)}'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('收藏於 ${_formatDate(item.createdAt)}'),
+                        const SizedBox(height: 8),
+                        ActionChip(
+                          avatar: const Icon(Icons.label_outline_rounded, size: 18),
+                          label: Text(item.category),
+                          onPressed: () => _chooseCategory(context, item),
+                        ),
+                      ],
+                    ),
                   ),
                   trailing: IconButton(
                     tooltip: '刪除收藏',
