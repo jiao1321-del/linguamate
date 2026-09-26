@@ -231,12 +231,21 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 const SizedBox(height: 12),
                 for (final idea in ideas)
                   ListTile(
-                    key: ValueKey('starter-idea-$idea'),
+                    key: ValueKey('starter-idea-${idea.text}'),
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.chat_bubble_outline_rounded),
-                    title: Text(idea),
+                    title: Text(idea.text),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        idea.chinese,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF756B82),
+                            ),
+                      ),
+                    ),
                     trailing: const Icon(Icons.north_west_rounded, size: 18),
-                    onTap: () => Navigator.of(context).pop(idea),
+                    onTap: () => Navigator.of(context).pop(idea.text),
                   ),
               ],
             ),
@@ -293,7 +302,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
     });
 
     _clearComposerAfterSend(message);
-    FocusManager.instance.primaryFocus?.unfocus();
     _scrollToBottom();
 
     // Persistence is best-effort and runs independently from the network
@@ -486,12 +494,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   child: TextField(
                     key: const ValueKey('chat-input'),
                     controller: _controller,
-                    enabled:
-                        !_isRestoring && !_isSending && _savingIndex == null,
+                    enabled: !_isRestoring && _savingIndex == null,
                     minLines: 1,
                     maxLines: 4,
-                    keyboardType: TextInputType.multiline,
-                    textInputAction: TextInputAction.newline,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) {
+                      if (!_isSending) {
+                        unawaited(_sendMessage());
+                      }
+                    },
                     decoration: InputDecoration(
                       hintText: _isRestoring
                           ? '正在載入對話...'
@@ -506,38 +518,48 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Listener(
-                  key: const ValueKey('send-chat-message'),
-                  behavior: HitTestBehavior.opaque,
-                  onPointerDown: (_) {
-                    if (_isRestoring ||
-                        _isSending ||
-                        _savingIndex != null) {
-                      return;
-                    }
-                    unawaited(_sendMessage());
-                  },
-                  child: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        shape: const CircleBorder(),
+                Semantics(
+                  button: true,
+                  label: '送出',
+                  enabled:
+                      !_isRestoring && !_isSending && _savingIndex == null,
+                  child: GestureDetector(
+                    key: const ValueKey('send-chat-message'),
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (_) {
+                      if (_isRestoring ||
+                          _isSending ||
+                          _savingIndex != null) {
+                        return;
+                      }
+                      unawaited(_sendMessage());
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _isSending
+                            ? Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.55)
+                            : Theme.of(context).colorScheme.primary,
+                        shape: BoxShape.circle,
                       ),
-                      onPressed:
-                          _isRestoring || _isSending || _savingIndex != null
-                              ? null
-                              : _sendMessage,
+                      alignment: Alignment.center,
                       child: _isSending
                           ? const SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
+                                color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.send_rounded),
+                          : const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                            ),
                     ),
                   ),
                 ),
