@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguamate/main.dart';
+import 'package:linguamate/models/ai_coach_reply.dart';
 import 'package:linguamate/models/language_analysis.dart';
 import 'package:linguamate/models/learning_item.dart';
+import 'package:linguamate/screens/ai_chat_screen.dart';
 import 'package:linguamate/screens/home_screen.dart';
 import 'package:linguamate/screens/learn_screen.dart';
 import 'package:linguamate/screens/learning_card_screen.dart';
@@ -174,6 +176,55 @@ void main() {
     expect(savedAnalysis?.tagalog, 'Babalikan kita mamaya.');
     expect(savedAnalysis?.learningPoints, hasLength(2));
     expect(openedSaved, isTrue);
+  });
+
+  testWidgets('AI chat coach sends message and renders coaching reply',
+      (tester) async {
+    String? sentMessage;
+    String? sentTarget;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiChatScreen(
+            onSend: (message, targetLanguage, history) async {
+              sentMessage = message;
+              sentTarget = targetLanguage;
+              return const AiCoachReply(
+                reply: 'I went to the gym after work. How about you?',
+                correction: 'I went to the gym after work today.',
+                explanation: '描述今天已經發生的事情時，go 要改成過去式 went。',
+                translation: '我下班後去健身房了。你呢？',
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('AI 對話教練'), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+    expect(find.text('Tagalog'), findsOneWidget);
+    expect(find.text('Taglish'), findsOneWidget);
+
+    await tester.enterText(
+      find.byType(TextField),
+      'Today I go gym after work.',
+    );
+    await tester.tap(find.byTooltip('送出'));
+    await tester.pumpAndSettle();
+
+    expect(sentMessage, 'Today I go gym after work.');
+    expect(sentTarget, 'English');
+    expect(find.text('Today I go gym after work.'), findsOneWidget);
+    expect(
+      find.text('I went to the gym after work. How about you?'),
+      findsOneWidget,
+    );
+    expect(find.text('✨ 更自然的說法'), findsOneWidget);
+    expect(find.text('I went to the gym after work today.'), findsOneWidget);
+    expect(find.text('💡 學習提示'), findsOneWidget);
+    expect(find.text('🇹🇼 中文意思'), findsOneWidget);
   });
 
   testWidgets('HomeScreen shows real due-review state', (tester) async {
