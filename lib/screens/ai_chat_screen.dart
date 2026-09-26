@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/ai_chat_state.dart';
@@ -154,12 +156,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Future<void> _sendMessage() async {
     if (_isRestoring || _isSending || _savingIndex != null) return;
 
-    // On iOS PWA, committing an IME composition can happen only after focus
-    // leaves the text field. Unfocus first, then read the finalized text.
-    FocusManager.instance.primaryFocus?.unfocus();
-    await Future<void>.delayed(const Duration(milliseconds: 30));
-
-    final message = _controller.text.trim();
+    // Capture the current controller value BEFORE changing focus. This keeps
+    // the user's in-progress iOS IME composition from being lost.
+    final message = _controller.value.text.trim();
     if (message.isEmpty) return;
 
     final history = _entries
@@ -171,6 +170,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
         )
         .toList(growable: false);
 
+    FocusManager.instance.primaryFocus?.unfocus();
+
     setState(() {
       _entries.add(AiChatMessage(mine: true, text: message));
       _controller.clear();
@@ -179,9 +180,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
     });
     _scrollToBottom();
 
-    // Saving chat history is best-effort. A storage issue must not prevent
-    // the actual AI request from being sent.
-    await _persistConversationSafely();
+    // Persistence is best-effort and runs independently from the network
+    // request so local storage can never delay or block sending.
+    unawaited(_persistConversationSafely());
 
     try {
       final reply = await widget.onSend(
@@ -200,7 +201,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ),
         );
       });
-      await _persistConversationSafely();
+      unawaited(_persistConversationSafely());
       _scrollToBottom();
     } catch (error) {
       if (!mounted) return;
@@ -373,8 +374,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         !_isRestoring && !_isSending && _savingIndex == null,
                     minLines: 1,
                     maxLines: 4,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _sendMessage(),
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
                       hintText: _isRestoring
                           ? '正在載入對話...'
