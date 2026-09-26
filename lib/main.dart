@@ -129,6 +129,30 @@ class _MainShellState extends State<MainShell> {
     });
   }
 
+  Future<void> _recordReviewResult(
+    String id,
+    bool remembered,
+  ) async {
+    final now = DateTime.now();
+    final updatedItems = _savedItems
+        .map(
+          (item) => item.id == id
+              ? item.reviewed(
+                  remembered: remembered,
+                  now: now,
+                )
+              : item,
+        )
+        .toList(growable: false);
+
+    await _learningStore.saveItems(updatedItems);
+    if (!mounted) return;
+
+    setState(() {
+      _savedItems = updatedItems;
+    });
+  }
+
   void _openPage(int index) {
     if (!mounted) return;
     setState(() => _index = index);
@@ -144,9 +168,27 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
+    final now = DateTime.now();
+    final dueItems = _savedItems
+        .where((item) => item.isDue(now))
+        .take(10)
+        .toList(growable: false);
+
+    if (dueItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('今天沒有到期的句子，複習任務完成 🎉'),
+        ),
+      );
+      return;
+    }
+
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => ReviewScreen(items: _savedItems),
+        builder: (context) => ReviewScreen(
+          items: dueItems,
+          onReviewResult: _recordReviewResult,
+        ),
       ),
     );
   }

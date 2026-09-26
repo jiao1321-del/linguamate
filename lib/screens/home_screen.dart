@@ -25,11 +25,13 @@ class HomeScreen extends StatelessWidget {
     }).length;
   }
 
-  int get _categorizedCount => items
-      .where((item) => item.category != LearningItem.uncategorized)
-      .length;
+  int get _dueCount {
+    final now = DateTime.now();
+    return items.where((item) => item.isDue(now)).length;
+  }
 
-  int get _uncategorizedCount => items.length - _categorizedCount;
+  int get _uncategorizedCount =>
+      items.where((item) => item.category == LearningItem.uncategorized).length;
 
   String _value(int value) => isLoading ? '—' : value.toString();
 
@@ -43,7 +45,8 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recentItems = items.take(3).toList(growable: false);
-    final reviewCount = items.length > 10 ? 10 : items.length;
+    final reviewCount = _dueCount > 10 ? 10 : _dueCount;
+    final hasDueItems = _dueCount > 0;
 
     return SafeArea(
       child: ListView(
@@ -67,9 +70,9 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               StatCard(
-                label: '今日新增',
-                value: _value(_todayCount),
-                icon: Icons.add_circle_outline,
+                label: '待複習',
+                value: _value(_dueCount),
+                icon: Icons.history_rounded,
               ),
             ],
           ),
@@ -77,9 +80,9 @@ class HomeScreen extends StatelessWidget {
           Row(
             children: [
               StatCard(
-                label: '已分類',
-                value: _value(_categorizedCount),
-                icon: Icons.label_outline_rounded,
+                label: '今日新增',
+                value: _value(_todayCount),
+                icon: Icons.add_circle_outline,
               ),
               const SizedBox(width: 12),
               StatCard(
@@ -107,14 +110,18 @@ class HomeScreen extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     leading: const CircleAvatar(child: Text('1')),
                     title: Text(
-                      reviewCount > 0
-                          ? '複習 $reviewCount 個收藏句子'
-                          : '新增 1 個今天真的會用到的句子',
+                      items.isEmpty
+                          ? '新增 1 個今天真的會用到的句子'
+                          : hasDueItems
+                              ? '複習 $reviewCount 個到期句子'
+                              : '今天的複習已完成',
                     ),
                     subtitle: Text(
-                      reviewCount > 0
-                          ? '用「記得 / 再複習」快速跑一輪'
-                          : '先建立第一張屬於你的複習卡',
+                      items.isEmpty
+                          ? '先建立第一張屬於你的複習卡'
+                          : hasDueItems
+                              ? '系統會依你的記憶狀況安排下次複習'
+                              : '下一批句子會在排定日期再次出現',
                     ),
                   ),
                   ListTile(
@@ -133,18 +140,24 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   FilledButton.icon(
-                    onPressed: isLoading ? null : onStartReview,
+                    onPressed: isLoading || (!hasDueItems && items.isNotEmpty)
+                        ? null
+                        : onStartReview,
                     icon: Icon(
                       items.isEmpty
                           ? Icons.add_rounded
-                          : Icons.play_arrow_rounded,
+                          : hasDueItems
+                              ? Icons.play_arrow_rounded
+                              : Icons.check_circle_outline_rounded,
                     ),
                     label: Text(
                       isLoading
                           ? '準備中...'
                           : items.isEmpty
                               ? '新增第一句'
-                              : '開始今日複習',
+                              : hasDueItems
+                                  ? '開始今日複習'
+                                  : '今日複習完成',
                     ),
                   ),
                 ],
