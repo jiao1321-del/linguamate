@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'models/language_analysis.dart';
 import 'models/learning_item.dart';
 import 'screens/ai_chat_screen.dart';
 import 'screens/backup_screen.dart';
@@ -73,7 +74,10 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  Future<bool> _saveLearningItem(String text) async {
+  Future<bool> _saveLearningItem(
+    String text,
+    LanguageAnalysis analysis,
+  ) async {
     final normalizedText = text.trim();
     if (normalizedText.isEmpty) return false;
 
@@ -87,6 +91,7 @@ class _MainShellState extends State<MainShell> {
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         text: normalizedText,
         createdAt: DateTime.now(),
+        analysis: analysis,
       ),
       ..._savedItems,
     ];

@@ -48,7 +48,7 @@ void main() {
                 ),
               ],
             ),
-            onSave: (_) async => true,
+            onSave: (_, __) async => true,
             onSaved: () {},
           ),
         ),
@@ -88,6 +88,92 @@ void main() {
     expect(find.text('mamaya'), findsOneWidget);
   });
 
+  testWidgets('LearnScreen pastes clipboard text', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: LearnScreen(
+            onAnalyze: (_) async => const LanguageAnalysis(
+              detectedLanguage: 'Tagalog',
+              chinese: '你好嗎？',
+              english: 'How are you?',
+              tagalog: 'Kumusta ka?',
+              tone: '自然問候。',
+              learningPoints: [],
+            ),
+            onSave: (_, __) async => true,
+            readClipboardText: () async => 'Kumusta ka?',
+            onSaved: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(OutlinedButton, '貼上文字'));
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<TextField>(find.byType(TextField).first);
+    expect(field.controller?.text, 'Kumusta ka?');
+    expect(find.text('已貼上剪貼簿文字。'), findsOneWidget);
+  });
+
+  testWidgets('LearnScreen saves full AI analysis with the sentence',
+      (tester) async {
+    LanguageAnalysis? savedAnalysis;
+    String? savedText;
+    var openedSaved = false;
+
+    const analysis = LanguageAnalysis(
+      detectedLanguage: 'English',
+      chinese: '我晚點回覆你。',
+      english: 'I will reply to you later.',
+      tagalog: 'Babalikan kita mamaya.',
+      tone: '自然、日常。',
+      learningPoints: [
+        LearningPoint(
+          title: 'reply',
+          explanation: '回覆。',
+        ),
+        LearningPoint(
+          title: 'mamaya',
+          explanation: '稍後。',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: LearnScreen(
+            onAnalyze: (_) async => analysis,
+            onSave: (text, result) async {
+              savedText = text;
+              savedAnalysis = result;
+              return true;
+            },
+            onSaved: () => openedSaved = true,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, '分析並學習'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(OutlinedButton, '加入我的學習'),
+      350,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, '加入我的學習'));
+    await tester.pumpAndSettle();
+
+    expect(savedText, 'I will reply to you later.');
+    expect(savedAnalysis?.tagalog, 'Babalikan kita mamaya.');
+    expect(savedAnalysis?.learningPoints, hasLength(2));
+    expect(openedSaved, isTrue);
+  });
+
   testWidgets('HomeScreen shows real due-review state', (tester) async {
     final now = DateTime.now();
     final items = [
@@ -102,6 +188,19 @@ void main() {
         text: 'I like it.',
         createdAt: now.subtract(const Duration(days: 1)),
         nextReviewAt: now.add(const Duration(days: 3)),
+        analysis: const LanguageAnalysis(
+          detectedLanguage: 'English',
+          chinese: '我晚點回覆。',
+          english: 'I will reply later.',
+          tagalog: 'Babalikan kita mamaya.',
+          tone: '自然。',
+          learningPoints: [
+            LearningPoint(
+              title: 'mamaya',
+              explanation: '稍後。',
+            ),
+          ],
+        ),
       ),
     ];
 
@@ -249,6 +348,7 @@ void main() {
     expect(item.reviewCount, 0);
     expect(item.lastReviewedAt, isNull);
     expect(item.nextReviewAt, isNull);
+    expect(item.analysis, isNull);
   });
 
   test('LearningItem schedules 1, 3 days then resets on review again', () {
@@ -299,6 +399,19 @@ void main() {
         reviewCount: 3,
         lastReviewedAt: now,
         nextReviewAt: now.add(const Duration(days: 3)),
+        analysis: const LanguageAnalysis(
+          detectedLanguage: 'English',
+          chinese: '我晚點回覆。',
+          english: 'I will reply later.',
+          tagalog: 'Babalikan kita mamaya.',
+          tone: '自然。',
+          learningPoints: [
+            LearningPoint(
+              title: 'mamaya',
+              explanation: '稍後。',
+            ),
+          ],
+        ),
       ),
     ];
 
@@ -317,6 +430,9 @@ void main() {
       restored.first.nextReviewAt,
       now.add(const Duration(days: 3)),
     );
+    expect(restored.first.analysis?.chinese, '我晚點回覆。');
+    expect(restored.first.analysis?.tagalog, 'Babalikan kita mamaya.');
+    expect(restored.first.analysis?.learningPoints.first.title, 'mamaya');
   });
 
   test('BackupCodec rejects invalid backup codes', () {

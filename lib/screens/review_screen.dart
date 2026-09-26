@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/learning_item.dart';
+import '../widgets/language_analysis_details.dart';
 
 class ReviewScreen extends StatefulWidget {
   final List<LearningItem> items;
@@ -240,14 +241,17 @@ class _ReviewScreenState extends State<ReviewScreen> {
                           },
                     child: Card(
                       clipBehavior: Clip.antiAlias,
-                      child: Container(
-                        width: double.infinity,
-                        constraints: const BoxConstraints(maxWidth: 520),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                          vertical: 34,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: 520,
+                          maxHeight: MediaQuery.sizeOf(context).height * 0.58,
                         ),
-                        child: Column(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 34,
+                          ),
+                          child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
@@ -290,6 +294,19 @@ class _ReviewScreenState extends State<ReviewScreen> {
                                         Text(
                                           '已複習 ${current.reviewCount} 次 · 階段 ${current.reviewLevel}',
                                         ),
+                                        const SizedBox(height: 14),
+                                        const Divider(),
+                                        const SizedBox(height: 10),
+                                        if (current.analysis != null)
+                                          LanguageAnalysisDetails(
+                                            analysis: current.analysis!,
+                                            compact: true,
+                                          )
+                                        else
+                                          const Text(
+                                            '這是 V1.1 以前收藏的句子，沒有保存 AI 三語分析。',
+                                            textAlign: TextAlign.center,
+                                          ),
                                       ],
                                     )
                                   : Text(
@@ -305,6 +322,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                           ],
                         ),
                       ),
+                    ),
                     ),
                   ),
                 ),

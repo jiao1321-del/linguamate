@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/language_analysis.dart';
 
 class LearnScreen extends StatefulWidget {
   final Future<LanguageAnalysis> Function(String text) onAnalyze;
-  final Future<bool> Function(String text) onSave;
+  final Future<bool> Function(
+    String text,
+    LanguageAnalysis analysis,
+  ) onSave;
+  final Future<String?> Function()? readClipboardText;
   final VoidCallback onSaved;
 
   const LearnScreen({
     super.key,
     required this.onAnalyze,
     required this.onSave,
+    this.readClipboardText,
     required this.onSaved,
   });
 
@@ -33,6 +39,31 @@ class _LearnScreenState extends State<LearnScreen> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _pasteText() async {
+    final rawText = widget.readClipboardText != null
+        ? await widget.readClipboardText!()
+        : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    if (!mounted) return;
+
+    final text = rawText?.trim();
+    if (text == null || text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('剪貼簿目前沒有文字。')),
+      );
+      return;
+    }
+
+    _controller.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _handleInputChanged(text);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已貼上剪貼簿文字。')),
+    );
   }
 
   Future<void> _analyzeCurrentSentence() async {
@@ -78,6 +109,7 @@ class _LearnScreenState extends State<LearnScreen> {
 
   Future<void> _saveCurrentSentence() async {
     final text = _controller.text.trim();
+    final analysis = _analysis;
 
     if (text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -86,16 +118,23 @@ class _LearnScreenState extends State<LearnScreen> {
       return;
     }
 
+    if (analysis == null || _analyzedText != text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('請先完成這句的 AI 分析，再加入我的學習。')),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
-      final added = await widget.onSave(text);
+      final added = await widget.onSave(text, analysis);
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            added ? '已加入我的學習 ✨' : '這個句子已經收藏過了。',
+            added ? '完整學習卡已加入收藏 ✨' : '這個句子已經收藏過了。',
           ),
         ),
       );
@@ -119,7 +158,8 @@ class _LearnScreenState extends State<LearnScreen> {
   void _handleInputChanged(String value) {
     final normalized = value.trim();
 
-    if (_analysis != null && normalized != _analyzedText) {
+    if ((_analysis != null || _analysisError != null) &&
+        normalized != _analyzedText) {
       setState(() {
         _analysis = null;
         _analysisError = null;
@@ -177,7 +217,16 @@ class _LearnScreenState extends State<LearnScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: _isAnalyzing ? null : _pasteText,
+              icon: const Icon(Icons.content_paste_rounded),
+              label: const Text('貼上文字'),
+            ),
+          ),
+          const SizedBox(height: 8),
           FilledButton.icon(
             onPressed: _isAnalyzing ? null : _analyzeCurrentSentence,
             icon: _isAnalyzing
@@ -297,6 +346,12 @@ class _LearnScreenState extends State<LearnScreen> {
                     )
                   : const Icon(Icons.bookmark_add_outlined),
               label: Text(_isSaving ? '儲存中...' : '加入我的學習'),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '會一起保存三語翻譯、語氣與學習重點，之後複習不用重新消耗 AI 額度。',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ],

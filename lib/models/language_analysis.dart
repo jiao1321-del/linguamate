@@ -7,6 +7,13 @@ class LearningPoint {
     required this.explanation,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'explanation': explanation,
+    };
+  }
+
   factory LearningPoint.fromJson(Map<String, dynamic> json) {
     return LearningPoint(
       title: (json['title'] as String? ?? '').trim(),
@@ -31,6 +38,17 @@ class LanguageAnalysis {
     required this.tone,
     required this.learningPoints,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'detectedLanguage': detectedLanguage,
+      'chinese': chinese,
+      'english': english,
+      'tagalog': tagalog,
+      'tone': tone,
+      'learningPoints': learningPoints.map((point) => point.toJson()).toList(),
+    };
+  }
 
   factory LanguageAnalysis.fromJson(Map<String, dynamic> json) {
     final rawPoints = json['learningPoints'];
