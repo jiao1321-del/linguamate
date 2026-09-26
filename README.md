@@ -17,24 +17,43 @@ LinguaMate 是一個個人語言學習 App，第一階段以 **中文、English�
 
 目前使用示範資料，不需要 API Key 就能先跑畫面。
 
+## 全手機開發模式
+
+目前專案以 **iPhone + ChatGPT + GitHub** 為主要開發流程。
+
+每次程式碼合併到 `main` 後，GitHub Actions 會自動：
+
+1. 安裝 Flutter stable
+2. 執行 `flutter pub get`
+3. 執行程式碼分析與測試
+4. 建置 Flutter Web release
+5. 將 GitHub Pages 專案路徑設定為 `/linguamate/`
+6. 產生 Web App / PWA 所需檔案與離線快取
+7. 發布到 GitHub Pages
+
+預設 Pages 網址：
+
+`https://jiao1321-del.github.io/linguamate/`
+
+> GitHub Free 帳號若 Repository 為 private，GitHub Pages 無法使用；可將 Repo 改為 public，或使用支援 private Pages 的 GitHub 方案。
+
 ## 技術方向
 
-- Flutter：iOS / Android 共用一套程式碼
+- Flutter：Web / iOS / Android 共用一套程式碼
+- PWA：可從 Safari 加到 iPhone 主畫面
+- GitHub Actions：自動測試、建置與發布
+- GitHub Pages：Web 版託管
 - Supabase：之後儲存帳號、收藏和學習紀錄
 - OpenAI API：之後加入翻譯、文法解釋、AI 對話和出題
-- GitHub：版本管理
 
-## 在電腦啟動
+## 本機開發（非必要）
 
-這個 Repository 目前先放 App 原始碼。第一次下載後，在專案資料夾執行：
+如果未來有使用電腦，也可以執行：
 
 ```bash
-flutter create .
 flutter pub get
 flutter run
 ```
-
-`flutter create .` 會補齊 Android、iOS、Web 等 Flutter 平台檔案，不會覆蓋目前的 `lib/` 程式碼。
 
 ## Roadmap
 
