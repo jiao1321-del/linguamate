@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import 'models/learning_item.dart';
 import 'screens/ai_chat_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/saved_screen.dart';
+import 'services/learning_store.dart';
 
 void main() {
   runApp(const LinguaMateApp());
@@ -36,22 +38,81 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int _index = 0;
+  final _learningStore = LearningStore();
 
-  static const _pages = [
-    HomeScreen(),
-    LearnScreen(),
-    AiChatScreen(),
-    SavedScreen(),
-    ProfileScreen(),
-  ];
+  int _index = 0;
+  bool _isLoadingSavedItems = true;
+  List<LearningItem> _savedItems = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedItems();
+  }
+
+  Future<void> _loadSavedItems() async {
+    try {
+      final items = await _learningStore.loadItems();
+      if (!mounted) return;
+
+      setState(() {
+        _savedItems = items;
+        _isLoadingSavedItems = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _savedItems = const [];
+        _isLoadingSavedItems = false;
+      });
+    }
+  }
+
+  Future<bool> _saveLearningItem(String text) async {
+    final normalizedText = text.trim();
+    if (normalizedText.isEmpty) return false;
+
+    final alreadySaved = _savedItems.any(
+      (item) => item.text.toLowerCase() == normalizedText.toLowerCase(),
+    );
+    if (alreadySaved) return false;
+
+    final updatedItems = [
+      LearningItem(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        text: normalizedText,
+        createdAt: DateTime.now(),
+      ),
+      ..._savedItems,
+    ];
+
+    await _learningStore.saveItems(updatedItems);
+    if (!mounted) return true;
+
+    setState(() {
+      _savedItems = updatedItems;
+    });
+    return true;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      const HomeScreen(),
+      LearnScreen(onSave: _saveLearningItem),
+      const AiChatScreen(),
+      SavedScreen(
+        items: _savedItems,
+        isLoading: _isLoadingSavedItems,
+      ),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _index,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
