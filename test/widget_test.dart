@@ -182,6 +182,7 @@ void main() {
       (tester) async {
     String? sentMessage;
     String? sentTarget;
+    String? savedLearningText;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -196,6 +197,10 @@ void main() {
                 explanation: '描述今天已經發生的事情時，go 要改成過去式 went。',
                 translation: '我下班後去健身房了。你呢？',
               );
+            },
+            onSaveLearning: (text) async {
+              savedLearningText = text;
+              return true;
             },
           ),
         ),
@@ -225,6 +230,17 @@ void main() {
     expect(find.text('I went to the gym after work today.'), findsOneWidget);
     expect(find.text('💡 學習提示'), findsOneWidget);
     expect(find.text('🇹🇼 中文意思'), findsOneWidget);
+
+    final saveButton = find.byKey(
+      const ValueKey('save-chat-learning-card'),
+    );
+    await tester.ensureVisible(saveButton);
+    await tester.pumpAndSettle();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+
+    expect(savedLearningText, 'I went to the gym after work today.');
+    expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
   });
 
   testWidgets('HomeScreen shows real due-review state', (tester) async {
