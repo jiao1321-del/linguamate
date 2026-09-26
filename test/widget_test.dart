@@ -222,7 +222,7 @@ void main() {
       find.byType(TextField),
       'Today I go gym after work.',
     );
-    await tester.tap(find.byTooltip('送出'));
+    await tester.tap(find.byKey(const ValueKey('send-chat-message')));
     await tester.pumpAndSettle();
 
     expect(sentMessage, 'Today I go gym after work.');
@@ -247,6 +247,44 @@ void main() {
 
     expect(savedLearningText, 'I went to the gym after work today.');
     expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
+  });
+
+  testWidgets('AI chat sends Traditional Chinese text from dedicated button',
+      (tester) async {
+    String? sentMessage;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiChatScreen(
+            onSend: (message, targetLanguage, history) async {
+              sentMessage = message;
+              return const AiCoachReply(
+                reply: 'Got it. What happened on the production line?',
+                correction: '',
+                explanation: '自然承接對話。',
+                translation: '了解。產線上發生了什麼事？',
+              );
+            },
+            onSaveLearning: (_) async => true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byType(TextField),
+      '無塵室的生產主任，目前剛出產線',
+    );
+    await tester.tap(find.byKey(const ValueKey('send-chat-message')));
+    await tester.pumpAndSettle();
+
+    expect(sentMessage, '無塵室的生產主任，目前剛出產線');
+    expect(
+      find.text('Got it. What happened on the production line?'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('AI chat restores saved conversation and language',
