@@ -447,8 +447,20 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('特定的檢驗流程前面加 the 會更自然。'), findsOneWidget);
-    expect(find.text('機台在檢驗過程中停止了。'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: reviewCard,
+        matching: find.text('特定的檢驗流程前面加 the 會更自然。'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: reviewCard,
+        matching: find.text('機台在檢驗過程中停止了。'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('review-save-2')));
     await tester.pumpAndSettle();
