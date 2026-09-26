@@ -390,28 +390,39 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: FilledButton(
-                    key: const ValueKey('send-chat-message'),
-                    style: FilledButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      shape: const CircleBorder(),
+                Listener(
+                  key: const ValueKey('send-chat-message'),
+                  behavior: HitTestBehavior.opaque,
+                  onPointerDown: (_) {
+                    if (_isRestoring ||
+                        _isSending ||
+                        _savingIndex != null) {
+                      return;
+                    }
+                    unawaited(_sendMessage());
+                  },
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        shape: const CircleBorder(),
+                      ),
+                      onPressed:
+                          _isRestoring || _isSending || _savingIndex != null
+                              ? null
+                              : _sendMessage,
+                      child: _isSending
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.send_rounded),
                     ),
-                    onPressed:
-                        _isRestoring || _isSending || _savingIndex != null
-                            ? null
-                            : _sendMessage,
-                    child: _isSending
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(Icons.send_rounded),
                   ),
                 ),
               ],
