@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 class LearnScreen extends StatefulWidget {
-  const LearnScreen({super.key});
+  final Future<bool> Function(String text) onSave;
+
+  const LearnScreen({
+    super.key,
+    required this.onSave,
+  });
 
   @override
   State<LearnScreen> createState() => _LearnScreenState();
@@ -13,11 +18,48 @@ class _LearnScreenState extends State<LearnScreen> {
   );
 
   bool _showResult = true;
+  bool _isSaving = false;
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveCurrentSentence() async {
+    final text = _controller.text.trim();
+
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('請先輸入一句想收藏的內容。')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final added = await widget.onSave(text);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            added ? '已加入我的學習 ✨' : '這個句子已經收藏過了。',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('儲存失敗，請稍後再試。')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -98,9 +140,15 @@ class _LearnScreenState extends State<LearnScreen> {
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.bookmark_add_outlined),
-              label: const Text('加入我的學習'),
+              onPressed: _isSaving ? null : _saveCurrentSentence,
+              icon: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.bookmark_add_outlined),
+              label: Text(_isSaving ? '儲存中...' : '加入我的學習'),
             ),
           ],
         ],
