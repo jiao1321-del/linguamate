@@ -199,10 +199,27 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Future<void> _showStarterIdeas() async {
     if (_isRestoring || _isSending || _savingIndex != null) return;
 
-    final ideas = PracticeStarterService.ideas(
-      language: _targetLanguage,
-      scenario: _scenario,
-    );
+    final latestSuggestions = _entries.reversed
+        .map((entry) => entry.reply?.suggestions ?? const <AiCoachSuggestion>[])
+        .firstWhere(
+          (items) => items.isNotEmpty,
+          orElse: () => const <AiCoachSuggestion>[],
+        );
+
+    final isDynamic = latestSuggestions.isNotEmpty;
+    final ideas = isDynamic
+        ? latestSuggestions
+            .map(
+              (item) => PracticeStarter(
+                text: item.text,
+                chinese: item.chinese,
+              ),
+            )
+            .toList(growable: false)
+        : PracticeStarterService.ideas(
+            language: _targetLanguage,
+            scenario: _scenario,
+          );
 
     final selected = await showModalBottomSheet<String>(
       context: context,
@@ -226,7 +243,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '點一句放進輸入框，再依你的情況修改。',
+                  isDynamic
+                      ? '依照目前對話推薦，下一輪會隨聊天內容更新。'
+                      : '先從情境題目開始；對話後會自動變成動態推薦。',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFF756B82),
                       ),

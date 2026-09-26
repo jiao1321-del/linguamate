@@ -202,6 +202,20 @@ void main() {
                 correction: 'I went to the gym after work today.',
                 explanation: '描述今天已經發生的事情時，go 要改成過去式 went。',
                 translation: '我下班後去健身房了。你呢？',
+                suggestions: [
+                  AiCoachSuggestion(
+                    text: 'I usually work out for about an hour.',
+                    chinese: '我通常會運動大約一小時。',
+                  ),
+                  AiCoachSuggestion(
+                    text: 'What do you usually do after work?',
+                    chinese: '你下班後通常會做什麼？',
+                  ),
+                  AiCoachSuggestion(
+                    text: 'Today was pretty tiring at work.',
+                    chinese: '今天工作其實滿累的。',
+                  ),
+                ],
               );
             },
             onSaveLearning: (text) async {
@@ -289,6 +303,28 @@ void main() {
     expect(find.text('💡 學習提示'), findsOneWidget);
     expect(find.text('🇹🇼 中文意思'), findsOneWidget);
     expect(find.byType(ShiliCoachAvatar), findsAtLeastNWidgets(2));
+
+    await tester.tap(find.byKey(const ValueKey('starter-ideas-button')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('依照目前對話推薦，下一輪會隨聊天內容更新。'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('I usually work out for about an hour.'),
+      findsOneWidget,
+    );
+    expect(find.text('我通常會運動大約一小時。'), findsOneWidget);
+    await tester.tap(find.text('I usually work out for about an hour.'));
+    await tester.pumpAndSettle();
+
+    final dynamicInput = tester.widget<TextField>(
+      find.byKey(const ValueKey('chat-input')),
+    );
+    expect(
+      dynamicInput.controller!.text,
+      'I usually work out for about an hour.',
+    );
 
     final saveButton = find.byKey(
       const ValueKey('save-chat-learning-card'),
@@ -522,6 +558,20 @@ void main() {
             correction: '',
             explanation: '自然的 Taglish 表達。',
             translation: '先稍微休息一下。',
+            suggestions: [
+              AiCoachSuggestion(
+                text: 'Medyo pagod lang ako today.',
+                chinese: '我今天只是有點累。',
+              ),
+              AiCoachSuggestion(
+                text: 'I’ll rest for a bit muna.',
+                chinese: '我先休息一下。',
+              ),
+              AiCoachSuggestion(
+                text: 'May work pa ako later.',
+                chinese: '我晚點還有工作。',
+              ),
+            ],
           ),
         ),
       ],
@@ -534,6 +584,14 @@ void main() {
     expect(loaded?.scenario, '日常生活');
     expect(loaded?.messages, hasLength(2));
     expect(loaded?.messages.last.reply?.translation, '先稍微休息一下。');
+    expect(
+      loaded?.messages.last.reply?.suggestions.first.text,
+      'Medyo pagod lang ako today.',
+    );
+    expect(
+      loaded?.messages.last.reply?.suggestions.first.chinese,
+      '我今天只是有點累。',
+    );
 
     await store.clear();
     expect(await store.load(), isNull);
