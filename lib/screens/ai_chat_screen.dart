@@ -272,26 +272,21 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   void _scrollToBottom() {
-    unawaited(_scrollToBottomReliably());
-  }
+    void jumpOnNextFrame(int remainingFrames) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
 
-  Future<void> _scrollToBottomReliably() async {
-    for (final delay in const [
-      Duration.zero,
-      Duration(milliseconds: 100),
-      Duration(milliseconds: 260),
-    ]) {
-      if (delay > Duration.zero) {
-        await Future<void>.delayed(delay);
-      }
+        _scrollController.jumpTo(
+          _scrollController.position.maxScrollExtent,
+        );
 
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted || !_scrollController.hasClients) continue;
-
-      _scrollController.jumpTo(
-        _scrollController.position.maxScrollExtent,
-      );
+        if (remainingFrames > 1) {
+          jumpOnNextFrame(remainingFrames - 1);
+        }
+      });
     }
+
+    jumpOnNextFrame(3);
   }
 
   @override
