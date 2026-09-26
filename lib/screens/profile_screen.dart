@@ -5,11 +5,13 @@ import '../models/learning_item.dart';
 class ProfileScreen extends StatelessWidget {
   final List<LearningItem> items;
   final bool isLoading;
+  final VoidCallback onOpenBackup;
 
   const ProfileScreen({
     super.key,
     required this.items,
     required this.isLoading,
+    required this.onOpenBackup,
   });
 
   int get _categorizedCount => items
@@ -123,6 +125,22 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            child: ListTile(
+              onTap: onOpenBackup,
+              contentPadding: const EdgeInsets.all(18),
+              leading: const Icon(Icons.backup_outlined),
+              title: const Text(
+                '備份與還原',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: const Text(
+                '備份收藏、分類與 SRS 複習進度',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
             ),
           ),
           const SizedBox(height: 18),

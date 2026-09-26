@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'models/learning_item.dart';
 import 'screens/ai_chat_screen.dart';
+import 'screens/backup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
@@ -129,6 +130,26 @@ class _MainShellState extends State<MainShell> {
     });
   }
 
+  Future<void> _restoreLearningItems(List<LearningItem> items) async {
+    await _learningStore.saveItems(items);
+    if (!mounted) return;
+
+    setState(() {
+      _savedItems = items;
+    });
+  }
+
+  Future<void> _openBackup() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => BackupScreen(
+          items: _savedItems,
+          onRestore: _restoreLearningItems,
+        ),
+      ),
+    );
+  }
+
   Future<void> _recordReviewResult(
     String id,
     bool remembered,
@@ -215,6 +236,7 @@ class _MainShellState extends State<MainShell> {
       ProfileScreen(
         items: _savedItems,
         isLoading: _isLoadingSavedItems,
+        onOpenBackup: _openBackup,
       ),
     ];
 
