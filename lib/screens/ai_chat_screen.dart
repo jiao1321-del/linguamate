@@ -402,38 +402,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return SafeArea(
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 12, 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'AI 對話教練',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                  ),
-                ),
-                if (_isRestoring)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 12),
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                else
-                  IconButton(
-                    tooltip: '清除對話',
-                    onPressed: _isSending || _savingIndex != null
-                        ? null
-                        : _clearConversation,
-                    icon: const Icon(Icons.delete_sweep_outlined),
-                  ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 10),
           ShiliCoachHeader(
             targetLanguage: _targetLanguage,
             scenario: _scenario,
@@ -444,6 +413,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             onLanguageSelected: _changeTarget,
             onScenarioSelected: _changeScenario,
             onStarterIdeas: _showStarterIdeas,
+            onClearConversation: _clearConversation,
           ),
           const SizedBox(height: 4),
           Expanded(
@@ -521,49 +491,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Semantics(
-                  button: true,
-                  label: '送出',
-                  enabled:
-                      !_isRestoring && !_isSending && _savingIndex == null,
-                  child: GestureDetector(
+                SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: IconButton.filled(
                     key: const ValueKey('send-chat-message'),
-                    behavior: HitTestBehavior.opaque,
-                    onTapDown: (_) {
-                      if (_isRestoring ||
-                          _isSending ||
-                          _savingIndex != null) {
-                        return;
-                      }
-                      unawaited(_sendMessage());
-                    },
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: _isSending
-                            ? Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.55)
-                            : Theme.of(context).colorScheme.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: _isSending
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.send_rounded,
+                    tooltip: '送出',
+                    onPressed:
+                        _isRestoring || _isSending || _savingIndex != null
+                            ? null
+                            : _sendMessage,
+                    icon: _isSending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
                               color: Colors.white,
                             ),
-                    ),
+                          )
+                        : const Icon(Icons.send_rounded),
                   ),
                 ),
               ],
