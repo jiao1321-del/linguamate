@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/learning_item.dart';
+import 'learning_card_screen.dart';
 
 class SavedScreen extends StatefulWidget {
   static const categories = <String>[
@@ -54,9 +55,21 @@ class _SavedScreenState extends State<SavedScreen> {
     return widget.items.where((item) {
       final matchesCategory = _selectedCategory == _allCategory ||
           item.category == _selectedCategory;
-      final matchesQuery = query.isEmpty ||
-          item.text.toLowerCase().contains(query) ||
-          item.category.toLowerCase().contains(query);
+      final analysis = item.analysis;
+      final searchable = [
+        item.text,
+        item.category,
+        if (analysis != null) ...[
+          analysis.chinese,
+          analysis.english,
+          analysis.tagalog,
+          analysis.tone,
+          ...analysis.learningPoints.expand(
+            (point) => [point.title, point.explanation],
+          ),
+        ],
+      ].join(' ').toLowerCase();
+      final matchesQuery = query.isEmpty || searchable.contains(query);
       return matchesCategory && matchesQuery;
     }).toList(growable: false);
   }
@@ -295,6 +308,13 @@ class _SavedScreenState extends State<SavedScreen> {
             for (final item in filteredItems) ...[
               Card(
                 child: ListTile(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => LearningCardScreen(item: item),
+                      ),
+                    );
+                  },
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 18,
                     vertical: 12,
@@ -313,10 +333,27 @@ class _SavedScreenState extends State<SavedScreen> {
                       children: [
                         Text('收藏於 ${_formatDate(item.createdAt)}'),
                         const SizedBox(height: 8),
-                        ActionChip(
-                          avatar: const Icon(Icons.label_outline_rounded, size: 18),
-                          label: Text(item.category),
-                          onPressed: () => _chooseCategory(context, item),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            ActionChip(
+                              avatar: const Icon(
+                                Icons.label_outline_rounded,
+                                size: 18,
+                              ),
+                              label: Text(item.category),
+                              onPressed: () => _chooseCategory(context, item),
+                            ),
+                            if (item.hasAnalysis)
+                              const Chip(
+                                avatar: Icon(
+                                  Icons.auto_awesome_rounded,
+                                  size: 18,
+                                ),
+                                label: Text('完整學習卡'),
+                              ),
+                          ],
                         ),
                       ],
                     ),
