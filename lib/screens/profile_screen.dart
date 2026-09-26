@@ -18,6 +18,17 @@ class ProfileScreen extends StatelessWidget {
 
   int get _uncategorizedCount => items.length - _categorizedCount;
 
+  int get _dueCount {
+    final now = DateTime.now();
+    return items.where((item) => item.isDue(now)).length;
+  }
+
+  int get _reviewedCount =>
+      items.where((item) => item.reviewCount > 0).length;
+
+  int get _stableCount =>
+      items.where((item) => item.reviewLevel >= 3).length;
+
   String _value(int value) => isLoading ? '—' : value.toString();
 
   @override
@@ -82,19 +93,53 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.history_rounded),
+                  title: const Text('目前待複習'),
+                  trailing: Text(
+                    _value(_dueCount),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.fact_check_outlined),
+                  title: const Text('已開始複習'),
+                  trailing: Text(
+                    _value(_reviewedCount),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.psychology_alt_outlined),
+                  title: const Text('穩定記憶'),
+                  subtitle: const Text('已達複習階段 3 以上'),
+                  trailing: Text(
+                    _value(_stableCount),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
             child: Padding(
               padding: const EdgeInsets.all(18),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    Icons.insights_outlined,
+                    Icons.auto_graph_rounded,
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      '這裡現在顯示的都是你的真實收藏資料。之後加入複習與學習進度後，這一頁也會跟著變成完整的學習統計。',
+                      'LinguaMate 現在會依你的複習結果安排下一次出現時間：1、3、7、14、30 天。按「再複習」會把該句重新排回優先複習。',
                     ),
                   ),
                 ],
