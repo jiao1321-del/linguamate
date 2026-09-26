@@ -251,6 +251,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('starter-ideas-button')));
     await tester.pumpAndSettle();
     expect(find.text('話題靈感 · 工作職場'), findsOneWidget);
+    expect(find.text('生產線上出現了一個問題。'), findsOneWidget);
     await tester.tap(find.text('There is a problem on the production line.'));
     await tester.pumpAndSettle();
 
@@ -292,6 +293,40 @@ void main() {
 
     expect(savedLearningText, 'I went to the gym after work today.');
     expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
+  });
+
+  testWidgets('AI chat can send from the keyboard send action',
+      (tester) async {
+    String? sentMessage;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiChatScreen(
+            onSend: (message, targetLanguage, scenario, history) async {
+              sentMessage = message;
+              return const AiCoachReply(
+                reply: 'Got it.',
+                correction: '',
+                explanation: '自然回覆。',
+                translation: '了解。',
+              );
+            },
+            onSaveLearning: (_) async => true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const ValueKey('chat-input'));
+    await tester.enterText(field, 'Can you help me check this issue?');
+    await tester.showKeyboard(field);
+    tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+
+    expect(sentMessage, 'Can you help me check this issue?');
+    expect(find.text('Got it.'), findsOneWidget);
   });
 
   testWidgets('AI chat sends Traditional Chinese text from dedicated button',
