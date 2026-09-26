@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../models/ai_chat_state.dart';
 import '../models/ai_coach_reply.dart';
+import '../services/ai_chat_store.dart';
 import '../widgets/gilded_card_icon.dart';
 
 typedef AiCoachSender = Future<AiCoachReply> Function(
@@ -14,11 +16,13 @@ typedef ChatLearningSaver = Future<bool> Function(String text);
 class AiChatScreen extends StatefulWidget {
   final AiCoachSender onSend;
   final ChatLearningSaver onSaveLearning;
+  final AiChatStore chatStore;
 
   const AiChatScreen({
     super.key,
     required this.onSend,
     required this.onSaveLearning,
+    this.chatStore = const AiChatStore(),
   });
 
   @override
@@ -32,15 +36,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final _scrollController = ScrollController();
 
   String _targetLanguage = 'English';
+  bool _isRestoring = true;
   bool _isSending = false;
   int? _savingIndex;
   String? _error;
-  late List<_ChatEntry> _entries;
+  late List<AiChatMessage> _entries;
 
   @override
   void initState() {
     super.initState();
     _entries = [_welcomeEntry(_targetLanguage)];
+    _restoreConversation();
   }
 
   @override
@@ -50,29 +56,61 @@ class _AiChatScreenState extends State<AiChatScreen> {
     super.dispose();
   }
 
-  _ChatEntry _welcomeEntry(String language) {
+  AiChatMessage _welcomeEntry(String language) {
     switch (language) {
       case 'Tagalog':
-        return const _ChatEntry(
+        return const AiChatMessage(
           mine: false,
           text:
               'Kumusta! Mag-practice tayo ng natural na Tagalog. Ano ang ginawa mo ngayon?',
         );
       case 'Taglish':
-        return const _ChatEntry(
+        return const AiChatMessage(
           mine: false,
           text: 'Hi! Let’s practice natural Taglish. Kumusta ang day mo today?',
         );
       default:
-        return const _ChatEntry(
+        return const AiChatMessage(
           mine: false,
           text: 'Hi! Let’s practice natural English. What did you do today?',
         );
     }
   }
 
-  void _changeTarget(String language) {
-    if (_isSending || _savingIndex != null || language == _targetLanguage) {
+  Future<void> _restoreConversation() async {
+    final saved = await widget.chatStore.load();
+    if (!mounted) return;
+
+    final language = saved != null && _targets.contains(saved.targetLanguage)
+        ? saved.targetLanguage
+        : 'English';
+    final messages = saved?.messages ?? const <AiChatMessage>[];
+
+    setState(() {
+      _targetLanguage = language;
+      _entries = messages.isEmpty ? [_welcomeEntry(language)] : messages;
+      _isRestoring = false;
+    });
+
+    if (messages.isNotEmpty) {
+      _scrollToBottom();
+    }
+  }
+
+  Future<void> _persistConversation() {
+    return widget.chatStore.save(
+      AiChatState(
+        targetLanguage: _targetLanguage,
+        messages: _entries,
+      ),
+    );
+  }
+
+  Future<void> _changeTarget(String language) async {
+    if (_isRestoring ||
+        _isSending ||
+        _savingIndex != null ||
+        language == _targetLanguage) {
       return;
     }
 
@@ -82,20 +120,28 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _error = null;
     });
     _controller.clear();
+    await _persistConversation();
   }
 
-  void _clearConversation() {
-    if (_isSending || _savingIndex != null) return;
+  Future<void> _clearConversation() async {
+    if (_isRestoring || _isSending || _savingIndex != null) return;
+
     setState(() {
       _entries = [_welcomeEntry(_targetLanguage)];
       _error = null;
     });
     _controller.clear();
+    await _persistConversation();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('AI 對話紀錄已清除。')),
+    );
   }
 
   Future<void> _sendMessage() async {
     final message = _controller.text.trim();
-    if (message.isEmpty || _isSending) return;
+    if (message.isEmpty || _isRestoring || _isSending) return;
 
     final history = _entries
         .map(
@@ -107,11 +153,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
         .toList(growable: false);
 
     setState(() {
-      _entries.add(_ChatEntry(mine: true, text: message));
+      _entries.add(AiChatMessage(mine: true, text: message));
       _controller.clear();
       _isSending = true;
       _error = null;
     });
+    await _persistConversation();
     _scrollToBottom();
 
     try {
@@ -124,13 +171,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
       setState(() {
         _entries.add(
-          _ChatEntry(
+          AiChatMessage(
             mine: false,
             text: reply.reply,
             reply: reply,
           ),
         );
       });
+      await _persistConversation();
       _scrollToBottom();
     } catch (error) {
       if (!mounted) return;
@@ -208,12 +256,23 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         ),
                   ),
                 ),
-                IconButton(
-                  tooltip: '清除對話',
-                  onPressed:
-                      _isSending || _savingIndex != null ? null : _clearConversation,
-                  icon: const Icon(Icons.refresh_rounded),
-                ),
+                if (_isRestoring)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 12),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else
+                  IconButton(
+                    tooltip: '清除對話',
+                    onPressed: _isSending || _savingIndex != null
+                        ? null
+                        : _clearConversation,
+                    icon: const Icon(Icons.delete_sweep_outlined),
+                  ),
               ],
             ),
           ),
@@ -229,7 +288,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 return ChoiceChip(
                   label: Text(language),
                   selected: _targetLanguage == language,
-                  onSelected: (_) => _changeTarget(language),
+                  onSelected: _isRestoring
+                      ? null
+                      : (_) => _changeTarget(language),
                 );
               },
             ),
@@ -281,13 +342,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             child: TextField(
               controller: _controller,
-              enabled: !_isSending && _savingIndex == null,
+              enabled: !_isRestoring && !_isSending && _savingIndex == null,
               minLines: 1,
               maxLines: 4,
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _sendMessage(),
               decoration: InputDecoration(
-                hintText: '用 $_targetLanguage 練習...',
+                hintText: _isRestoring
+                    ? '正在載入對話...'
+                    : '用 $_targetLanguage 練習...',
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -297,7 +360,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 suffixIcon: IconButton(
                   tooltip: '送出',
                   onPressed:
-                      _isSending || _savingIndex != null ? null : _sendMessage,
+                      _isRestoring || _isSending || _savingIndex != null
+                          ? null
+                          : _sendMessage,
                   icon: _isSending
                       ? const SizedBox(
                           width: 20,
@@ -315,20 +380,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 }
 
-class _ChatEntry {
-  final bool mine;
-  final String text;
-  final AiCoachReply? reply;
-
-  const _ChatEntry({
-    required this.mine,
-    required this.text,
-    this.reply,
-  });
-}
-
 class _ConversationEntry extends StatelessWidget {
-  final _ChatEntry entry;
+  final AiChatMessage entry;
   final bool isSaving;
   final VoidCallback? onSave;
 
