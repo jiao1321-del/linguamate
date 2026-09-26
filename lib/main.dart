@@ -107,6 +107,19 @@ class _MainShellState extends State<MainShell> {
     return true;
   }
 
+  Future<bool> _saveChatLearningItem(String text) async {
+    final normalizedText = text.trim();
+    if (normalizedText.isEmpty) return false;
+
+    final alreadySaved = _savedItems.any(
+      (item) => item.text.toLowerCase() == normalizedText.toLowerCase(),
+    );
+    if (alreadySaved) return false;
+
+    final analysis = await _analysisService.analyze(normalizedText);
+    return _saveLearningItem(normalizedText, analysis);
+  }
+
   Future<void> _deleteLearningItem(String id) async {
     final updatedItems =
         _savedItems.where((item) => item.id != id).toList(growable: false);
@@ -236,7 +249,10 @@ class _MainShellState extends State<MainShell> {
         onSave: _saveLearningItem,
         onSaved: _openSavedItems,
       ),
-      AiChatScreen(onSend: _aiChatService.send),
+      AiChatScreen(
+        onSend: _aiChatService.send,
+        onSaveLearning: _saveChatLearningItem,
+      ),
       SavedScreen(
         items: _savedItems,
         isLoading: _isLoadingSavedItems,
