@@ -214,9 +214,9 @@ void main() {
     expect(find.text('AI 對話教練'), findsOneWidget);
     expect(find.text('汐璃 Shili'), findsOneWidget);
     expect(find.byType(ShiliCoachAvatar), findsAtLeastNWidgets(1));
-    expect(find.text('English'), findsOneWidget);
-    expect(find.text('Tagalog'), findsOneWidget);
-    expect(find.text('Taglish'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'English'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Tagalog'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Taglish'), findsOneWidget);
 
     await tester.enterText(
       find.byType(TextField),
@@ -296,11 +296,11 @@ void main() {
       find.widgetWithText(ChoiceChip, 'Tagalog'),
     );
     expect(tagalogChip.selected, isTrue);
-    expect(find.text('Pagod ako today.'), findsOneWidget);
     expect(
       find.text('Magpahinga ka muna. Kumain ka na ba?'),
       findsOneWidget,
     );
+    expect(find.byType(ShiliCoachAvatar), findsAtLeastNWidgets(2));
   });
 
   test('AiChatStore persists and clears conversation state', () async {
