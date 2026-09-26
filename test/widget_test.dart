@@ -217,33 +217,50 @@ void main() {
     expect(find.text('AI 對話教練'), findsOneWidget);
     expect(find.text('汐璃 Shili'), findsOneWidget);
     expect(find.byType(ShiliCoachAvatar), findsAtLeastNWidgets(1));
-    expect(find.widgetWithText(ChoiceChip, 'English'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, 'Tagalog'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, 'Taglish'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '自由對話'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '日常生活'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '工作職場'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '旅行'), findsOneWidget);
-
     final coachPanel = find.byType(ShiliCoachHeader);
     expect(coachPanel, findsOneWidget);
     expect(
       find.descendant(
         of: coachPanel,
-        matching: find.widgetWithText(ChoiceChip, 'English'),
+        matching: find.byKey(const ValueKey('language-selector')),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: coachPanel,
-        matching: find.widgetWithText(ChoiceChip, '工作職場'),
+        matching: find.byKey(const ValueKey('scenario-selector')),
       ),
       findsOneWidget,
     );
 
-    await tester.tap(find.widgetWithText(ChoiceChip, '工作職場'));
+    final languageDropdown = tester.widget<DropdownButton<String>>(
+      find.byKey(const ValueKey('language-selector')),
+    );
+    final scenarioDropdown = tester.widget<DropdownButton<String>>(
+      find.byKey(const ValueKey('scenario-selector')),
+    );
+    expect(languageDropdown.value, 'English');
+    expect(scenarioDropdown.value, '自由對話');
+
+    await tester.tap(find.byKey(const ValueKey('scenario-selector')));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('工作職場').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('starter-ideas-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('話題靈感 · 工作職場'), findsOneWidget);
+    await tester.tap(find.text('There is a problem on the production line.'));
+    await tester.pumpAndSettle();
+
+    final starterInput = tester.widget<TextField>(
+      find.byKey(const ValueKey('chat-input')),
+    );
+    expect(
+      starterInput.controller!.text,
+      'There is a problem on the production line.',
+    );
 
     await tester.enterText(
       find.byType(TextField),
@@ -391,14 +408,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final tagalogChip = tester.widget<ChoiceChip>(
-      find.widgetWithText(ChoiceChip, 'Tagalog'),
+    final languageDropdown = tester.widget<DropdownButton<String>>(
+      find.byKey(const ValueKey('language-selector')),
     );
-    expect(tagalogChip.selected, isTrue);
-    final travelChip = tester.widget<ChoiceChip>(
-      find.widgetWithText(ChoiceChip, '旅行'),
+    expect(languageDropdown.value, 'Tagalog');
+    final scenarioDropdown = tester.widget<DropdownButton<String>>(
+      find.byKey(const ValueKey('scenario-selector')),
     );
-    expect(travelChip.selected, isTrue);
+    expect(scenarioDropdown.value, '旅行');
     expect(
       find.text('Magpahinga ka muna. Kumain ka na ba?'),
       findsOneWidget,

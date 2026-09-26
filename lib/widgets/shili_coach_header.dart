@@ -10,6 +10,7 @@ class ShiliCoachHeader extends StatelessWidget {
   final bool enabled;
   final ValueChanged<String> onLanguageSelected;
   final ValueChanged<String> onScenarioSelected;
+  final VoidCallback onStarterIdeas;
 
   const ShiliCoachHeader({
     super.key,
@@ -20,6 +21,7 @@ class ShiliCoachHeader extends StatelessWidget {
     required this.enabled,
     required this.onLanguageSelected,
     required this.onScenarioSelected,
+    required this.onStarterIdeas,
   });
 
   String get _subtitle {
@@ -33,21 +35,52 @@ class ShiliCoachHeader extends StatelessWidget {
     }
   }
 
-  Widget _choiceChip({
+  Widget _selector({
     required String label,
-    required bool selected,
-    required VoidCallback onTap,
-    Key? key,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String> onChanged,
+    required Key key,
   }) {
-    return ChoiceChip(
-      key: key,
-      label: Text(label),
-      selected: selected,
-      showCheckmark: true,
-      visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      labelPadding: const EdgeInsets.symmetric(horizontal: 7),
-      onSelected: enabled ? (_) => onTap() : null,
+    return Expanded(
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          contentPadding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
+          filled: true,
+          fillColor: const Color(0xFFF8F5FC),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            key: key,
+            value: value,
+            isExpanded: true,
+            isDense: true,
+            icon: const Icon(Icons.keyboard_arrow_down_rounded),
+            items: items
+                .map(
+                  (item) => DropdownMenuItem<String>(
+                    value: item,
+                    child: Text(
+                      item,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+            onChanged: enabled
+                ? (selected) {
+                    if (selected != null) onChanged(selected);
+                  }
+                : null,
+          ),
+        ),
+      ),
     );
   }
 
@@ -71,11 +104,10 @@ class ShiliCoachHeader extends StatelessWidget {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const ShiliCoachAvatar(size: 50),
+              const ShiliCoachAvatar(size: 48),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -94,65 +126,45 @@ class ShiliCoachHeader extends StatelessWidget {
                         const Text('✨'),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       _subtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: const Color(0xFF6F667B),
-                            height: 1.35,
+                            height: 1.3,
                           ),
                     ),
                   ],
                 ),
               ),
+              IconButton.filledTonal(
+                key: const ValueKey('starter-ideas-button'),
+                tooltip: '話題靈感',
+                visualDensity: VisualDensity.compact,
+                onPressed: enabled ? onStarterIdeas : null,
+                icon: const Icon(Icons.lightbulb_outline_rounded),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFF0EBF6)),
           const SizedBox(height: 10),
-          Text(
-            '練習語言',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: const Color(0xFF756B82),
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: 7),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: languages
-                .map(
-                  (language) => _choiceChip(
-                    label: language,
-                    selected: targetLanguage == language,
-                    onTap: () => onLanguageSelected(language),
-                  ),
-                )
-                .toList(growable: false),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            '對話情境',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: const Color(0xFF756B82),
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: 7),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: scenarios
-                .map(
-                  (item) => _choiceChip(
-                    key: ValueKey('scenario-$item'),
-                    label: item,
-                    selected: scenario == item,
-                    onTap: () => onScenarioSelected(item),
-                  ),
-                )
-                .toList(growable: false),
+          Row(
+            children: [
+              _selector(
+                key: const ValueKey('language-selector'),
+                label: '語言',
+                value: targetLanguage,
+                items: languages,
+                onChanged: onLanguageSelected,
+              ),
+              const SizedBox(width: 10),
+              _selector(
+                key: const ValueKey('scenario-selector'),
+                label: '情境',
+                value: scenario,
+                items: scenarios,
+                onChanged: onScenarioSelected,
+              ),
+            ],
           ),
         ],
       ),
