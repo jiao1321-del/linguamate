@@ -4,10 +4,12 @@ import '../models/learning_item.dart';
 
 class ReviewScreen extends StatefulWidget {
   final List<LearningItem> items;
+  final Future<void> Function(String id, bool remembered) onReviewResult;
 
   const ReviewScreen({
     super.key,
     required this.items,
+    required this.onReviewResult,
   });
 
   @override
@@ -19,6 +21,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   late int _targetCount;
 
   bool _showDetails = false;
+  bool _isSavingReview = false;
   int _rememberedCount = 0;
   int _againCount = 0;
 
@@ -32,6 +35,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
     _remaining = widget.items.take(10).toList(growable: true);
     _targetCount = _remaining.length;
     _showDetails = false;
+    _isSavingReview = false;
     _rememberedCount = 0;
     _againCount = 0;
   }
@@ -43,25 +47,59 @@ class _ReviewScreenState extends State<ReviewScreen> {
     return '${local.year}/$month/$day';
   }
 
-  void _remember() {
-    if (_remaining.isEmpty) return;
+  Future<void> _remember() async {
+    if (_remaining.isEmpty || _isSavingReview) return;
+    final current = _remaining.first;
 
-    setState(() {
-      _remaining.removeAt(0);
-      _rememberedCount += 1;
-      _showDetails = false;
-    });
+    setState(() => _isSavingReview = true);
+
+    try {
+      await widget.onReviewResult(current.id, true);
+      if (!mounted) return;
+
+      setState(() {
+        _remaining.removeAt(0);
+        _rememberedCount += 1;
+        _showDetails = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('複習進度儲存失敗，請再試一次。')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingReview = false);
+      }
+    }
   }
 
-  void _reviewAgain() {
-    if (_remaining.isEmpty) return;
+  Future<void> _reviewAgain() async {
+    if (_remaining.isEmpty || _isSavingReview) return;
+    final current = _remaining.first;
 
-    setState(() {
-      final current = _remaining.removeAt(0);
-      _remaining.add(current);
-      _againCount += 1;
-      _showDetails = false;
-    });
+    setState(() => _isSavingReview = true);
+
+    try {
+      await widget.onReviewResult(current.id, false);
+      if (!mounted) return;
+
+      setState(() {
+        final item = _remaining.removeAt(0);
+        _remaining.add(item);
+        _againCount += 1;
+        _showDetails = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('複習進度儲存失敗，請再試一次。')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingReview = false);
+      }
+    }
   }
 
   void _restart() {
@@ -80,26 +118,26 @@ class _ReviewScreenState extends State<ReviewScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  Icons.bookmark_add_outlined,
+                  Icons.event_available_rounded,
                   size: 56,
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  '還沒有可以複習的句子',
+                  '今天沒有到期句子',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '先到「學習」頁收藏一句，之後就能在這裡開始複習。',
+                  '完成得很漂亮。句子會在排定的日期再次出現。',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('返回'),
+                  child: const Text('回到首頁'),
                 ),
               ],
             ),
@@ -131,17 +169,18 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  '完成 $_targetCount 句，過程中有 $_againCount 次選擇再複習。',
+                  '完成 $_targetCount 句，過程中有 $_againCount 次選擇再複習。\n'
+                  '按「記得」的句子已自動排入下一次複習。',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 22),
-                FilledButton.icon(
+                OutlinedButton.icon(
                   onPressed: _restart,
                   icon: const Icon(Icons.replay_rounded),
-                  label: const Text('再複習一次'),
+                  label: const Text('現在再跑一輪'),
                 ),
                 const SizedBox(height: 10),
-                TextButton(
+                FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('回到首頁'),
                 ),
@@ -194,9 +233,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
               Expanded(
                 child: Center(
                   child: GestureDetector(
-                    onTap: () {
-                      setState(() => _showDetails = !_showDetails);
-                    },
+                    onTap: _isSavingReview
+                        ? null
+                        : () {
+                            setState(() => _showDetails = !_showDetails);
+                          },
                     child: Card(
                       clipBehavior: Clip.antiAlias,
                       child: Container(
@@ -245,6 +286,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
                                         Text(
                                           '收藏於 ${_formatDate(current.createdAt)}',
                                         ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          '已複習 ${current.reviewCount} 次 · 階段 ${current.reviewLevel}',
+                                        ),
                                       ],
                                     )
                                   : Text(
@@ -269,7 +314,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _reviewAgain,
+                      onPressed: _isSavingReview ? null : _reviewAgain,
                       icon: const Icon(Icons.refresh_rounded),
                       label: const Text('再複習'),
                     ),
@@ -277,9 +322,15 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: _remember,
-                      icon: const Icon(Icons.check_rounded),
-                      label: const Text('記得'),
+                      onPressed: _isSavingReview ? null : _remember,
+                      icon: _isSavingReview
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check_rounded),
+                      label: Text(_isSavingReview ? '儲存中...' : '記得'),
                     ),
                   ),
                 ],
