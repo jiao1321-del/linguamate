@@ -12,6 +12,7 @@ import 'models/weakness_record.dart';
 import 'screens/ai_chat_screen.dart';
 import 'screens/backup_screen.dart';
 import 'screens/daily_training_screen.dart';
+import 'screens/growth_center_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
@@ -22,6 +23,7 @@ import 'services/ai_chat_service.dart';
 import 'services/ai_chat_store.dart';
 import 'services/daily_training_plan_builder.dart';
 import 'services/daily_training_store.dart';
+import 'services/daily_goal_store.dart';
 import 'services/language_analysis_service.dart';
 import 'services/learning_ability_analyzer.dart';
 import 'services/learning_ability_store.dart';
@@ -68,6 +70,7 @@ class _MainShellState extends State<MainShell> {
   final _aiChatStore = const AiChatStore();
   final _weaknessStore = const WeaknessStore();
   final _dailyTrainingStore = const DailyTrainingStore();
+  final _dailyGoalStore = const DailyGoalStore();
   final _mistakeStore = const MistakeStore();
   final _learningAbilityStore = const LearningAbilityStore();
   final _learningProgressStore = const LearningProgressStore();
@@ -82,6 +85,7 @@ class _MainShellState extends State<MainShell> {
   List<LearningAbilityRecord> _abilityRecords = const [];
   List<DailyTrainingSummary> _trainingHistory = const [];
   DailyTrainingSummary? _dailyTrainingSummary;
+  int _dailyGoal = DailyGoalStore.defaultGoal;
 
   @override
   void initState() {
@@ -92,6 +96,7 @@ class _MainShellState extends State<MainShell> {
     _loadMistakes();
     _loadLearningAbility();
     _loadLearningProgress();
+    _loadDailyGoal();
   }
 
   Future<void> _loadSavedItems() async {
@@ -148,6 +153,18 @@ class _MainShellState extends State<MainShell> {
     final history = await _learningProgressStore.load();
     if (!mounted) return;
     setState(() => _trainingHistory = history);
+  }
+
+  Future<void> _loadDailyGoal() async {
+    final goal = await _dailyGoalStore.load();
+    if (!mounted) return;
+    setState(() => _dailyGoal = goal);
+  }
+
+  Future<void> _updateDailyGoal(int goal) async {
+    await _dailyGoalStore.save(goal);
+    if (!mounted) return;
+    setState(() => _dailyGoal = goal);
   }
 
   LearningAbilityReport _buildAbilityReport() {
@@ -428,6 +445,21 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
+  Future<void> _openGrowthCenter() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => GrowthCenterScreen(
+          report: progressReport,
+          initialDailyGoal: _dailyGoal,
+          onDailyGoalChanged: _updateDailyGoal,
+        ),
+      ),
+    );
+  }
+
   void _handleLearningPathAction(String action) {
     switch (action) {
       case 'mistakes':
@@ -577,6 +609,7 @@ class _MainShellState extends State<MainShell> {
         abilityReport: abilityReport,
         onPracticeMistakes: _startMistakeTraining,
         onOpenProgress: _openProgressCenter,
+        onOpenGrowth: _openGrowthCenter,
         onOpenBackup: _openBackup,
       ),
     ];
