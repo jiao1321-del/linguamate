@@ -4,6 +4,7 @@ import 'package:linguamate/models/ai_coach_reply.dart';
 import 'package:linguamate/models/daily_training.dart';
 import 'package:linguamate/models/language_analysis.dart';
 import 'package:linguamate/models/learning_item.dart';
+import 'package:linguamate/models/learning_ability.dart';
 import 'package:linguamate/models/mistake_record.dart';
 import 'package:linguamate/models/weakness_record.dart';
 import 'package:linguamate/screens/daily_training_screen.dart';
@@ -11,6 +12,8 @@ import 'package:linguamate/screens/home_screen.dart';
 import 'package:linguamate/screens/profile_screen.dart';
 import 'package:linguamate/services/daily_training_plan_builder.dart';
 import 'package:linguamate/services/daily_training_store.dart';
+import 'package:linguamate/services/learning_ability_analyzer.dart';
+import 'package:linguamate/services/learning_ability_store.dart';
 import 'package:linguamate/services/mistake_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -301,6 +304,188 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('practice-mistakes-button')));
     expect(practiced, isTrue);
+  });
+
+  test('LearningAbilityStore tracks mastery and weak skills', () async {
+    const store = LearningAbilityStore();
+    const vocabularyTask = DailyTrainingTask(
+      id: 'vocab-inspect',
+      type: 'vocabulary',
+      title: '單字・片語',
+      prompt: 'inspect',
+      answer: '檢查',
+    );
+    const grammarTask = DailyTrainingTask(
+      id: 'grammar-past',
+      type: 'grammar',
+      title: '文法加強 · 過去式',
+      prompt: 'Yesterday I ___ home.',
+      answer: 'went',
+      options: ['go', 'went', 'going'],
+      correctIndex: 1,
+    );
+    final start = DateTime.utc(2026, 9, 28, 1);
+
+    var records = await store.recordResult(
+      task: grammarTask,
+      correct: false,
+      now: start,
+    );
+    records = await store.recordResult(
+      task: grammarTask,
+      correct: false,
+      now: start.add(const Duration(minutes: 1)),
+    );
+
+    var grammar = records.firstWhere((item) => item.type == 'grammar');
+    expect(grammar.status, AbilityStatus.needsWork);
+    expect(grammar.wrongCount, 2);
+    expect(grammar.accuracy, 0);
+
+    await store.recordResult(
+      task: vocabularyTask,
+      correct: false,
+      now: start.add(const Duration(minutes: 2)),
+    );
+    for (var index = 0; index < 4; index++) {
+      records = await store.recordResult(
+        task: vocabularyTask,
+        correct: true,
+        now: start.add(Duration(minutes: index + 3)),
+      );
+    }
+
+    final vocabulary =
+        records.firstWhere((item) => item.type == 'vocabulary');
+    expect(vocabulary.attempts, 5);
+    expect(vocabulary.correctCount, 4);
+    expect(vocabulary.score, greaterThanOrEqualTo(80));
+    expect(vocabulary.status, AbilityStatus.mastered);
+
+    grammar = records.firstWhere((item) => item.type == 'grammar');
+    expect(grammar.statusLabel, '待加強');
+  });
+
+  test('LearningAbilityAnalyzer can seed report from existing weaknesses', () {
+    final now = DateTime.utc(2026, 9, 28, 2);
+    final report = LearningAbilityAnalyzer.build(
+      tracked: const [],
+      mistakes: const [],
+      weaknesses: [
+        WeaknessRecord(
+          category: '時態',
+          count: 3,
+          example: 'Yesterday I go home.',
+          correction: 'Yesterday I went home.',
+          explanation: '過去時間用過去式。',
+          lastSeenAt: now,
+        ),
+      ],
+    );
+
+    expect(report.records, hasLength(1));
+    expect(report.priorityLabel, '時態');
+    expect(report.priorityType, 'weakness');
+    expect(report.needsWorkCount, 1);
+    expect(report.totalWrong, 3);
+  });
+
+  test('DailyTrainingPlanBuilder moves weakest skill type forward', () {
+    const reply = AiCoachReply(
+      reply: 'Try this.',
+      correction: '',
+      explanation: '',
+      translation: '',
+      vocabulary: [
+        AiCoachVocabulary(
+          term: 'inspect',
+          chinese: '檢查',
+          example: 'Please inspect it.',
+          exampleChinese: '請檢查它。',
+        ),
+        AiCoachVocabulary(
+          term: 'confirm',
+          chinese: '確認',
+          example: 'Please confirm it.',
+          exampleChinese: '請確認它。',
+        ),
+      ],
+      grammar: AiCoachGrammar(
+        title: '過去式',
+        explanation: '過去發生的事情使用過去式。',
+        question: 'Yesterday I ___ home.',
+        choices: ['go', 'went', 'going'],
+        answerIndex: 1,
+        answerExplanation: 'Yesterday 對應 went。',
+      ),
+    );
+
+    final plan = DailyTrainingPlanBuilder.build(
+      learningItems: const [],
+      weaknesses: const [],
+      coachReplies: const [reply],
+      priorityType: 'grammar',
+    );
+
+    expect(plan.tasks, isNotEmpty);
+    expect(plan.tasks.first.type, 'grammar');
+    expect(plan.tasks.first.title, contains('過去式'));
+  });
+
+  testWidgets('ProfileScreen shows learning ability dashboard',
+      (tester) async {
+    final now = DateTime.utc(2026, 9, 28, 3);
+    final report = LearningAbilityReport(
+      records: [
+        LearningAbilityRecord(
+          key: 'grammar:past',
+          label: '過去式',
+          type: 'grammar',
+          attempts: 4,
+          correctCount: 1,
+          wrongCount: 3,
+          correctStreak: 0,
+          lastResultCorrect: false,
+          lastPracticedAt: now,
+        ),
+        LearningAbilityRecord(
+          key: 'vocabulary',
+          label: '單字・片語',
+          type: 'vocabulary',
+          attempts: 5,
+          correctCount: 4,
+          wrongCount: 1,
+          correctStreak: 4,
+          lastResultCorrect: true,
+          lastPracticedAt: now,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(
+          items: const [],
+          isLoading: false,
+          abilityReport: report,
+          onOpenBackup: () {},
+        ),
+      ),
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('learning-ability-card')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('學習能力'), findsOneWidget);
+    expect(find.text('🎯 目前優先加強：過去式'), findsOneWidget);
+    expect(find.text('過去式'), findsOneWidget);
+    expect(find.text('待加強'), findsAtLeastNWidgets(1));
+    expect(find.text('單字・片語'), findsOneWidget);
+    expect(find.text('已掌握'), findsAtLeastNWidgets(1));
   });
 
   test('DailyTrainingStore persists completion summary', () async {
