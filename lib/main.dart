@@ -4,6 +4,7 @@ import 'models/ai_coach_reply.dart';
 import 'models/daily_training.dart';
 import 'models/language_analysis.dart';
 import 'models/learning_item.dart';
+import 'models/mistake_record.dart';
 import 'models/weakness_record.dart';
 import 'screens/ai_chat_screen.dart';
 import 'screens/backup_screen.dart';
@@ -19,6 +20,7 @@ import 'services/daily_training_plan_builder.dart';
 import 'services/daily_training_store.dart';
 import 'services/language_analysis_service.dart';
 import 'services/learning_store.dart';
+import 'services/mistake_store.dart';
 import 'services/weakness_classifier.dart';
 import 'services/weakness_store.dart';
 
@@ -58,6 +60,7 @@ class _MainShellState extends State<MainShell> {
   final _aiChatStore = const AiChatStore();
   final _weaknessStore = const WeaknessStore();
   final _dailyTrainingStore = const DailyTrainingStore();
+  final _mistakeStore = const MistakeStore();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
@@ -65,6 +68,7 @@ class _MainShellState extends State<MainShell> {
   List<LearningItem> _savedItems = const [];
   List<WeaknessRecord> _weaknesses = const [];
   List<AiCoachReply> _coachReplies = const [];
+  List<MistakeRecord> _mistakes = const [];
   DailyTrainingSummary? _dailyTrainingSummary;
 
   @override
@@ -73,6 +77,7 @@ class _MainShellState extends State<MainShell> {
     _loadSavedItems();
     _loadWeaknesses();
     _loadTrainingContext();
+    _loadMistakes();
   }
 
   Future<void> _loadSavedItems() async {
@@ -113,6 +118,12 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
+  Future<void> _loadMistakes() async {
+    final records = await _mistakeStore.load();
+    if (!mounted) return;
+    setState(() => _mistakes = records);
+  }
+
   Future<void> _loadTrainingContext() async {
     final chatState = await _aiChatStore.load();
     final summary = await _dailyTrainingStore.load();
@@ -146,6 +157,41 @@ class _MainShellState extends State<MainShell> {
       learningItems: _savedItems,
       weaknesses: _weaknesses,
       coachReplies: _coachReplies,
+      mistakes: _mistakes,
+    );
+  }
+
+  Future<void> _recordTrainingResult(
+    DailyTrainingTask task,
+    bool correct,
+  ) async {
+    final records = await _mistakeStore.recordResult(
+      task: task,
+      correct: correct,
+    );
+    if (!mounted) return;
+    setState(() => _mistakes = records);
+  }
+
+  Future<void> _startMistakeTraining() async {
+    final plan = DailyTrainingPlanBuilder.buildMistakeOnly(_mistakes);
+    if (plan.tasks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('目前沒有需要再加強的錯題 🎉')),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => DailyTrainingScreen(
+          title: '錯題加強',
+          plan: plan,
+          onReviewResult: _recordReviewResult,
+          onTaskResult: _recordTrainingResult,
+          onCompleted: (_) async {},
+        ),
+      ),
     );
   }
 
@@ -175,6 +221,7 @@ class _MainShellState extends State<MainShell> {
         builder: (context) => DailyTrainingScreen(
           plan: plan,
           onReviewResult: _recordReviewResult,
+          onTaskResult: _recordTrainingResult,
           onCompleted: _completeDailyTraining,
         ),
       ),
@@ -400,6 +447,8 @@ class _MainShellState extends State<MainShell> {
         isLoading: _isLoadingSavedItems,
         weaknesses: _weaknesses,
         isLoadingWeaknesses: _isLoadingWeaknesses,
+        mistakes: _mistakes,
+        onPracticeMistakes: _startMistakeTraining,
         onOpenBackup: _openBackup,
       ),
     ];
