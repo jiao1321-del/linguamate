@@ -15,60 +15,38 @@ class GildedCardIcon extends StatelessWidget {
     return Semantics(
       label: 'AI 學習卡',
       child: Container(
+        key: const ValueKey('shili-coach-card-v14'),
         width: width,
         height: height,
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(width * 0.22),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF2A1B0B),
-              Color(0xFF7B521B),
-              Color(0xFFD8B34D),
-              Color(0xFF5C3B12),
-            ],
-            stops: [0.0, 0.34, 0.68, 1.0],
-          ),
           border: Border.all(
-            color: const Color(0xFFFFE59A),
+            color: const Color(0xFFD8B34D),
             width: 1.4,
           ),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x55B98B2E),
+              color: Color(0x44B98B2E),
               blurRadius: 8,
               spreadRadius: 1,
             ),
           ],
         ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned(
-              top: height * 0.12,
-              left: width * 0.16,
+        child: Image.asset(
+          'assets/images/shili_coach_card_v14.jpg',
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              alignment: Alignment.center,
+              color: const Color(0xFFF6EAC3),
               child: Icon(
                 Icons.auto_awesome_rounded,
-                size: width * 0.28,
-                color: const Color(0xFFFFF1B8),
+                size: width * 0.55,
+                color: const Color(0xFF7B521B),
               ),
-            ),
-            Icon(
-              Icons.style_rounded,
-              size: width * 0.58,
-              color: const Color(0xFFFFF6D6),
-            ),
-            Positioned(
-              right: width * 0.12,
-              bottom: height * 0.10,
-              child: Icon(
-                Icons.star_rounded,
-                size: width * 0.23,
-                color: const Color(0xFFFFD666),
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
