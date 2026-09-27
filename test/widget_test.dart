@@ -487,8 +487,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('🧩 文法加強'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('grammar-practice-card')),
+      findsOneWidget,
+    );
     expect(find.text('特定流程前的 the'), findsOneWidget);
+    expect(
+      find.text('The machine stopped during ___ inspection.'),
+      findsOneWidget,
+    );
 
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('grammar-choice-1')),
