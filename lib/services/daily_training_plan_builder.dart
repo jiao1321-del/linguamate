@@ -29,7 +29,12 @@ class DailyTrainingPlanBuilder {
         .toSet()
         .toList(growable: false);
 
-    for (var index = 0; index < vocabulary.length && tasks.length < 3; index++) {
+    var vocabularyAdded = 0;
+    for (var index = 0;
+        index < vocabulary.length &&
+            vocabularyAdded < 3 &&
+            tasks.length < 10;
+        index++) {
       final item = vocabulary[index];
       final options = <String>[
         item.chinese,
@@ -64,6 +69,7 @@ class DailyTrainingPlanBuilder {
             ),
           ),
         );
+        vocabularyAdded++;
       } else {
         final taskId = 'vocab-${item.term.toLowerCase()}';
         if (tasks.any((task) => task.id == taskId)) continue;
@@ -84,6 +90,7 @@ class DailyTrainingPlanBuilder {
             ),
           ),
         );
+        vocabularyAdded++;
       }
     }
 
