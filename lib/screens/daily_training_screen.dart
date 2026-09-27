@@ -9,17 +9,25 @@ typedef DailyReviewRecorder = Future<void> Function(
 typedef DailyTrainingCompletion = Future<void> Function(
   DailyTrainingSummary summary,
 );
+typedef DailyTaskResultRecorder = Future<void> Function(
+  DailyTrainingTask task,
+  bool correct,
+);
 
 class DailyTrainingScreen extends StatefulWidget {
   final DailyTrainingPlan plan;
   final DailyReviewRecorder onReviewResult;
   final DailyTrainingCompletion onCompleted;
+  final DailyTaskResultRecorder? onTaskResult;
+  final String title;
 
   const DailyTrainingScreen({
     super.key,
     required this.plan,
     required this.onReviewResult,
     required this.onCompleted,
+    this.onTaskResult,
+    this.title = '今日訓練',
   });
 
   @override
@@ -54,6 +62,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
     if (learningItemId != null) {
       await widget.onReviewResult(learningItemId, isCorrect);
     }
+    await widget.onTaskResult?.call(task, isCorrect);
   }
 
   Future<void> _rateSelf(bool remembered) async {
@@ -71,6 +80,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
     if (learningItemId != null) {
       await widget.onReviewResult(learningItemId, remembered);
     }
+    await widget.onTaskResult?.call(task, remembered);
 
     if (!mounted) return;
     setState(() => _saving = false);
@@ -127,7 +137,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
   Widget build(BuildContext context) {
     if (_finished) {
       return Scaffold(
-        appBar: AppBar(title: const Text('今日訓練')),
+        appBar: AppBar(title: Text(widget.title)),
         body: SafeArea(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
@@ -192,7 +202,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('今日訓練'),
+        title: Text(widget.title),
       ),
       body: SafeArea(
         child: Padding(

@@ -1,6 +1,7 @@
 import '../models/ai_coach_reply.dart';
 import '../models/daily_training.dart';
 import '../models/learning_item.dart';
+import '../models/mistake_record.dart';
 import '../models/weakness_record.dart';
 
 class DailyTrainingPlanBuilder {
@@ -10,9 +11,15 @@ class DailyTrainingPlanBuilder {
     required List<LearningItem> learningItems,
     required List<WeaknessRecord> weaknesses,
     required List<AiCoachReply> coachReplies,
+    List<MistakeRecord> mistakes = const <MistakeRecord>[],
     DateTime? now,
   }) {
     final tasks = <DailyTrainingTask>[];
+    final activeMistakes = mistakes.where((item) => item.isActive).take(3);
+
+    for (final mistake in activeMistakes) {
+      tasks.add(mistake.toTask());
+    }
     final referenceTime = now ?? DateTime.now();
 
     final vocabulary = _recentVocabulary(coachReplies);
@@ -22,7 +29,12 @@ class DailyTrainingPlanBuilder {
         .toSet()
         .toList(growable: false);
 
-    for (var index = 0; index < vocabulary.length && tasks.length < 3; index++) {
+    var vocabularyAdded = 0;
+    for (var index = 0;
+        index < vocabulary.length &&
+            vocabularyAdded < 3 &&
+            tasks.length < 10;
+        index++) {
       final item = vocabulary[index];
       final options = <String>[
         item.chinese,
@@ -36,9 +48,11 @@ class DailyTrainingPlanBuilder {
           ...options.take(offset),
         ];
         final correctIndex = rotated.indexOf(item.chinese);
+        final taskId = 'vocab-${item.term.toLowerCase()}';
+        if (tasks.any((task) => task.id == taskId)) continue;
         tasks.add(
           DailyTrainingTask(
-            id: 'vocab-${item.term.toLowerCase()}',
+            id: taskId,
             type: 'vocabulary',
             title: '單字・片語',
             prompt: item.term,
@@ -55,10 +69,13 @@ class DailyTrainingPlanBuilder {
             ),
           ),
         );
+        vocabularyAdded++;
       } else {
+        final taskId = 'vocab-${item.term.toLowerCase()}';
+        if (tasks.any((task) => task.id == taskId)) continue;
         tasks.add(
           DailyTrainingTask(
-            id: 'vocab-${item.term.toLowerCase()}',
+            id: taskId,
             type: 'vocabulary',
             title: '單字・片語',
             prompt: item.term,
@@ -73,6 +90,7 @@ class DailyTrainingPlanBuilder {
             ),
           ),
         );
+        vocabularyAdded++;
       }
     }
 
@@ -81,9 +99,11 @@ class DailyTrainingPlanBuilder {
         index < grammarItems.length && index < 2 && tasks.length < 10;
         index++) {
       final grammar = grammarItems[index];
+      final taskId = 'grammar-${grammar.title.toLowerCase()}';
+      if (tasks.any((task) => task.id == taskId)) continue;
       tasks.add(
         DailyTrainingTask(
-          id: 'grammar-${grammar.title.toLowerCase()}',
+          id: taskId,
           type: 'grammar',
           title: '文法加強 · ${grammar.title}',
           prompt: grammar.question,
@@ -104,9 +124,11 @@ class DailyTrainingPlanBuilder {
       final correction = weakness.correction.trim();
       if (prompt.isEmpty || correction.isEmpty) continue;
 
+      final taskId = 'weakness-${weakness.category}-$index';
+      if (tasks.any((task) => task.id == taskId)) continue;
       tasks.add(
         DailyTrainingTask(
-          id: 'weakness-${weakness.category}-$index',
+          id: taskId,
           type: 'weakness',
           title: '弱點加強 · ${weakness.category}',
           prompt: prompt,
@@ -126,9 +148,11 @@ class DailyTrainingPlanBuilder {
 
     for (final item in dueItems) {
       if (tasks.length >= 10) break;
+      final taskId = 'review-${item.id}';
+      if (tasks.any((task) => task.id == taskId)) continue;
       tasks.add(
         DailyTrainingTask(
-          id: 'review-${item.id}',
+          id: taskId,
           type: 'review',
           title: 'SRS 複習',
           prompt: item.text,
@@ -142,6 +166,17 @@ class DailyTrainingPlanBuilder {
     return DailyTrainingPlan(
       tasks: tasks.take(10).toList(growable: false),
     );
+  }
+
+  static DailyTrainingPlan buildMistakeOnly(
+    List<MistakeRecord> mistakes,
+  ) {
+    final tasks = mistakes
+        .where((item) => item.isActive)
+        .take(10)
+        .map((item) => item.toTask())
+        .toList(growable: false);
+    return DailyTrainingPlan(tasks: tasks);
   }
 
   static List<AiCoachVocabulary> _recentVocabulary(
