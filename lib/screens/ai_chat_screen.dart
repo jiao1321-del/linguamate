@@ -559,12 +559,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
     if (reply == null) return;
 
     final text = reply.hasCorrection ? reply.correction : reply.reply;
-    if (text.trim().isEmpty) return;
+    await _saveLearningText(text, savingIndex: index);
+  }
 
-    setState(() => _savingIndex = index);
+  Future<void> _saveLearningText(
+    String text, {
+    int savingIndex = -1,
+  }) async {
+    if (_savingIndex != null || text.trim().isEmpty) return;
+
+    setState(() => _savingIndex = savingIndex);
 
     try {
-      final added = await widget.onSaveLearning(text);
+      final added = await widget.onSaveLearning(text.trim());
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -572,7 +579,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           content: Text(
             added
                 ? '已變成鎏金學習卡並加入收藏 ✨'
-                : '這個句子已經收藏過了。',
+                : '這個內容已經收藏過了。',
           ),
         ),
       );
