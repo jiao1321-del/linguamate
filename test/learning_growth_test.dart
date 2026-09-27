@@ -13,10 +13,10 @@ void main() {
         DailyTrainingSummary(
           dateKey: '2026-09-21',
           totalTasks: 8,
-          correctTasks: 5,
+          correctTasks: 6,
           completedAt: DateTime(2026, 9, 21, 9),
           typeTotals: const {'vocabulary': 4, 'grammar': 4},
-          typeCorrect: const {'vocabulary': 3, 'grammar': 2},
+          typeCorrect: const {'vocabulary': 3, 'grammar': 3},
         ),
         DailyTrainingSummary(
           dateKey: '2026-09-27',
