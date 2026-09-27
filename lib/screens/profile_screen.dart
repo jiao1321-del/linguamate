@@ -14,6 +14,7 @@ class ProfileScreen extends StatelessWidget {
   final LearningAbilityReport abilityReport;
   final VoidCallback? onPracticeMistakes;
   final VoidCallback? onOpenProgress;
+  final VoidCallback? onOpenGrowth;
   final VoidCallback onOpenBackup;
 
   const ProfileScreen({
@@ -28,6 +29,7 @@ class ProfileScreen extends StatelessWidget {
     ),
     this.onPracticeMistakes,
     this.onOpenProgress,
+    this.onOpenGrowth,
     required this.onOpenBackup,
   });
 
@@ -157,6 +159,23 @@ class ProfileScreen extends StatelessWidget {
               ),
               subtitle: const Text(
                 '連續天數、近 7 天題數、能力分布與近期訓練紀錄',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            key: const ValueKey('growth-center-entry'),
+            child: ListTile(
+              onTap: onOpenGrowth,
+              contentPadding: const EdgeInsets.all(18),
+              leading: const Icon(Icons.rocket_launch_outlined),
+              title: const Text(
+                '成長中心',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: const Text(
+                '每日目標、XP 等級、成就徽章、近 7 天週報與 28 天學習日曆',
               ),
               trailing: const Icon(Icons.chevron_right_rounded),
             ),
