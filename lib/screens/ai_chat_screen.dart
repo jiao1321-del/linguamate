@@ -6,6 +6,7 @@ import '../models/ai_chat_state.dart';
 import '../models/ai_coach_reply.dart';
 import '../services/ai_chat_store.dart';
 import '../services/practice_starter_service.dart';
+import '../services/speech_coach_service.dart';
 import '../widgets/gilded_card_icon.dart';
 import '../widgets/shili_coach_avatar.dart';
 import '../widgets/shili_coach_header.dart';
@@ -28,6 +29,7 @@ class AiChatScreen extends StatefulWidget {
   final ChatLearningSaver onSaveLearning;
   final ChatWeaknessRecorder? onWeaknessDetected;
   final ValueChanged<AiCoachReply>? onLearningPackUpdated;
+  final SpeechCoachService? speechService;
   final AiChatStore chatStore;
 
   const AiChatScreen({
@@ -36,6 +38,7 @@ class AiChatScreen extends StatefulWidget {
     required this.onSaveLearning,
     this.onWeaknessDetected,
     this.onLearningPackUpdated,
+    this.speechService,
     this.chatStore = const AiChatStore(),
   });
 
@@ -54,11 +57,13 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  late final SpeechCoachService _speechService;
 
   String _targetLanguage = 'English';
   String _scenario = '自由對話';
   bool _isRestoring = true;
   bool _isSending = false;
+  bool _isListening = false;
   int? _savingIndex;
   String? _error;
   late List<AiChatMessage> _entries;
@@ -66,12 +71,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   void initState() {
     super.initState();
+    _speechService = widget.speechService ?? createSpeechCoachService();
     _entries = [_welcomeEntry(_targetLanguage, _scenario)];
     _restoreConversation();
   }
 
   @override
   void dispose() {
+    _speechService.stop();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -168,6 +175,57 @@ class _AiChatScreenState extends State<AiChatScreen> {
         }
       }),
     );
+  }
+
+  String get _speechLanguageTag => switch (_targetLanguage) {
+        'Tagalog' => 'fil-PH',
+        'Taglish' => 'en-PH',
+        _ => 'en-US',
+      };
+
+  Future<void> _speakText(String text) async {
+    if (!_speechService.canSpeak || text.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('目前這個瀏覽器無法使用語音朗讀。')),
+      );
+      return;
+    }
+
+    await _speechService.speak(
+      text: text,
+      languageTag: _speechLanguageTag,
+    );
+  }
+
+  Future<void> _startVoiceInput() async {
+    if (_isListening || _isSending || _isRestoring) return;
+
+    if (!_speechService.canListen) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('目前瀏覽器不支援語音輸入，仍可使用鍵盤練習。'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isListening = true);
+    try {
+      final transcript = await _speechService.listen(
+        languageTag: _speechLanguageTag,
+      );
+      if (!mounted || transcript == null || transcript.trim().isEmpty) return;
+
+      _controller.value = TextEditingValue(
+        text: transcript.trim(),
+        selection: TextSelection.collapsed(
+          offset: transcript.trim().length,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isListening = false);
+    }
   }
 
   Future<void> _changeTarget(String language) async {
@@ -653,6 +711,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   onSave: entry.reply == null
                       ? null
                       : () => _saveLearningEntry(index),
+                  onSpeak: entry.mine
+                      ? null
+                      : () => _speakText(
+                            entry.reply?.reply ?? entry.text,
+                          ),
                 );
               },
             ),
@@ -712,6 +775,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                SizedBox(
+                  width: 46,
+                  height: 50,
+                  child: IconButton(
+                    key: const ValueKey('voice-chat-input'),
+                    tooltip: '語音輸入',
+                    onPressed: _isRestoring || _isSending || _isListening
+                        ? null
+                        : _startVoiceInput,
+                    icon: _isListening
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.mic_none_rounded),
+                  ),
+                ),
+                const SizedBox(width: 4),
                 SizedBox(
                   width: 50,
                   height: 50,
@@ -1030,11 +1112,13 @@ class _ConversationEntry extends StatelessWidget {
   final AiChatMessage entry;
   final bool isSaving;
   final VoidCallback? onSave;
+  final VoidCallback? onSpeak;
 
   const _ConversationEntry({
     required this.entry,
     required this.isSaving,
     required this.onSave,
+    required this.onSpeak,
   });
 
   @override
@@ -1073,15 +1157,30 @@ class _ConversationEntry extends StatelessWidget {
                 Flexible(
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 278),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
                     ),
-                    child: SelectableText(entry.text),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: SelectableText(entry.text)),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          key: ValueKey(
+                            'speak-shili-${entry.text.hashCode}',
+                          ),
+                          tooltip: '聽 Shili 朗讀',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: onSpeak,
+                          icon: const Icon(
+                            Icons.volume_up_outlined,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
