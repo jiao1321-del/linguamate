@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../models/learning_item.dart';
+import '../models/weakness_record.dart';
 
 class ProfileScreen extends StatelessWidget {
   final List<LearningItem> items;
   final bool isLoading;
+  final List<WeaknessRecord> weaknesses;
+  final bool isLoadingWeaknesses;
   final VoidCallback onOpenBackup;
 
   const ProfileScreen({
     super.key,
     required this.items,
     required this.isLoading,
+    this.weaknesses = const <WeaknessRecord>[],
+    this.isLoadingWeaknesses = false,
     required this.onOpenBackup,
   });
 
@@ -125,6 +130,69 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.track_changes_outlined,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '常見弱點',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (isLoadingWeaknesses)
+                    const LinearProgressIndicator()
+                  else if (weaknesses.isEmpty)
+                    const Text(
+                      '和 Shili 對話後，常見修正會自動整理在這裡。',
+                    )
+                  else
+                    for (final weakness in weaknesses.take(5)) ...[
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: CircleAvatar(
+                          child: Text(
+                            weakness.count.toString(),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        title: Text(
+                          weakness.category,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: weakness.explanation.trim().isEmpty
+                            ? null
+                            : Text(
+                                weakness.explanation,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                        trailing: Text(
+                          '${weakness.count} 次',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      if (weakness != weaknesses.take(5).last)
+                        const Divider(height: 1),
+                    ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 18),
