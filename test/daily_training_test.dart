@@ -4,11 +4,14 @@ import 'package:linguamate/models/ai_coach_reply.dart';
 import 'package:linguamate/models/daily_training.dart';
 import 'package:linguamate/models/language_analysis.dart';
 import 'package:linguamate/models/learning_item.dart';
+import 'package:linguamate/models/mistake_record.dart';
 import 'package:linguamate/models/weakness_record.dart';
 import 'package:linguamate/screens/daily_training_screen.dart';
 import 'package:linguamate/screens/home_screen.dart';
+import 'package:linguamate/screens/profile_screen.dart';
 import 'package:linguamate/services/daily_training_plan_builder.dart';
 import 'package:linguamate/services/daily_training_store.dart';
+import 'package:linguamate/services/mistake_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -179,6 +182,125 @@ void main() {
     expect(find.text('今日訓練'), findsOneWidget);
     expect(find.text('6 題 · 約 5 分鐘'), findsOneWidget);
     expect(find.text('開始今日訓練'), findsOneWidget);
+  });
+
+  test('MistakeStore records errors and fades after three correct answers',
+      () async {
+    const store = MistakeStore();
+    const task = DailyTrainingTask(
+      id: 'grammar-tense',
+      type: 'grammar',
+      title: '文法加強 · 過去式',
+      prompt: 'Yesterday I ___ home.',
+      answer: 'went',
+      explanation: 'Yesterday 通常使用過去式。',
+      options: ['go', 'went', 'going'],
+      correctIndex: 1,
+    );
+    final start = DateTime.utc(2026, 9, 27, 4);
+
+    var records = await store.recordResult(
+      task: task,
+      correct: false,
+      now: start,
+    );
+    expect(records, hasLength(1));
+    expect(records.first.wrongCount, 1);
+    expect(records.first.correctStreak, 0);
+    expect(records.first.isActive, isTrue);
+
+    records = await store.recordResult(
+      task: task,
+      correct: false,
+      now: start.add(const Duration(minutes: 1)),
+    );
+    expect(records.first.wrongCount, 2);
+
+    for (var index = 0; index < 3; index++) {
+      records = await store.recordResult(
+        task: task,
+        correct: true,
+        now: start.add(Duration(minutes: index + 2)),
+      );
+    }
+
+    expect(records.first.correctStreak, 3);
+    expect(records.first.isActive, isFalse);
+    expect(store.active(records), isEmpty);
+  });
+
+  test('DailyTrainingPlanBuilder puts active mistakes first', () {
+    final now = DateTime.utc(2026, 9, 27, 4);
+    final mistake = MistakeRecord(
+      taskId: 'grammar-past',
+      type: 'grammar',
+      title: '文法加強 · 過去式',
+      prompt: 'Yesterday I ___ home.',
+      answer: 'went',
+      explanation: 'Yesterday 通常使用過去式。',
+      options: const ['go', 'went', 'going'],
+      correctIndex: 1,
+      wrongCount: 4,
+      correctStreak: 0,
+      lastWrongAt: now,
+    );
+
+    final plan = DailyTrainingPlanBuilder.build(
+      learningItems: const [],
+      weaknesses: const [],
+      coachReplies: const [],
+      mistakes: [mistake],
+      now: now,
+    );
+
+    expect(plan.tasks, isNotEmpty);
+    expect(plan.tasks.first.id, 'grammar-past');
+
+    final mistakeOnly = DailyTrainingPlanBuilder.buildMistakeOnly([mistake]);
+    expect(mistakeOnly.totalTasks, 1);
+    expect(mistakeOnly.tasks.first.prompt, 'Yesterday I ___ home.');
+  });
+
+  testWidgets('ProfileScreen shows mistake book and retry action',
+      (tester) async {
+    var practiced = false;
+    final mistake = MistakeRecord(
+      taskId: 'vocab-issue',
+      type: 'vocabulary',
+      title: '單字・片語',
+      prompt: 'issue',
+      answer: '問題',
+      explanation: 'There is an issue.',
+      wrongCount: 2,
+      correctStreak: 0,
+      lastWrongAt: DateTime.utc(2026, 9, 27, 4),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(
+          items: const [],
+          isLoading: false,
+          mistakes: [mistake],
+          onPracticeMistakes: () => practiced = true,
+          onOpenBackup: () {},
+        ),
+      ),
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('mistake-book-card')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('錯題本'), findsOneWidget);
+    expect(find.text('1 待加強'), findsOneWidget);
+    expect(find.text('issue'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('practice-mistakes-button')));
+    expect(practiced, isTrue);
   });
 
   test('DailyTrainingStore persists completion summary', () async {
