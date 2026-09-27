@@ -9,6 +9,7 @@ class HomeScreen extends StatelessWidget {
   final int dailyTrainingTaskCount;
   final int dailyTrainingEstimatedMinutes;
   final bool dailyTrainingCompleted;
+  final String? dailyTrainingFocusLabel;
   final VoidCallback? onStartDailyTraining;
   final VoidCallback onStartReview;
 
@@ -19,6 +20,7 @@ class HomeScreen extends StatelessWidget {
     this.dailyTrainingTaskCount = 0,
     this.dailyTrainingEstimatedMinutes = 0,
     this.dailyTrainingCompleted = false,
+    this.dailyTrainingFocusLabel,
     this.onStartDailyTraining,
     required this.onStartReview,
   });
@@ -141,7 +143,9 @@ class HomeScreen extends StatelessWidget {
                   Text(
                     dailyTrainingCompleted
                         ? '今天已完成；想加強的話可以再練一次。'
-                        : '依你的單字、文法、常見弱點與 SRS 到期內容自動安排。',
+                        : dailyTrainingFocusLabel?.trim().isNotEmpty == true
+                            ? '今日優先：$dailyTrainingFocusLabel · 依熟練度自動調整題目順序。'
+                            : '依你的單字、文法、常見弱點與 SRS 到期內容自動安排。',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFF756B82),
                         ),
