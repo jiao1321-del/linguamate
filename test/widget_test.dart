@@ -7,15 +7,19 @@ import 'package:linguamate/models/ai_chat_state.dart';
 import 'package:linguamate/models/ai_coach_reply.dart';
 import 'package:linguamate/models/language_analysis.dart';
 import 'package:linguamate/models/learning_item.dart';
+import 'package:linguamate/models/weakness_record.dart';
 import 'package:linguamate/screens/ai_chat_screen.dart';
 import 'package:linguamate/screens/home_screen.dart';
 import 'package:linguamate/screens/learn_screen.dart';
 import 'package:linguamate/screens/learning_card_screen.dart';
+import 'package:linguamate/screens/profile_screen.dart';
 import 'package:linguamate/screens/review_screen.dart';
 import 'package:linguamate/screens/saved_screen.dart';
 import 'package:linguamate/services/ai_chat_store.dart';
 import 'package:linguamate/services/backup_codec.dart';
 import 'package:linguamate/services/learning_store.dart';
+import 'package:linguamate/services/weakness_classifier.dart';
+import 'package:linguamate/services/weakness_store.dart';
 import 'package:linguamate/widgets/gilded_card_icon.dart';
 import 'package:linguamate/widgets/shili_coach_avatar.dart';
 import 'package:linguamate/widgets/shili_coach_header.dart';
@@ -188,6 +192,8 @@ void main() {
     String? sentTarget;
     String? sentScenario;
     String? savedLearningText;
+    String? weaknessUserText;
+    AiCoachReply? weaknessReply;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -221,6 +227,10 @@ void main() {
             onSaveLearning: (text) async {
               savedLearningText = text;
               return true;
+            },
+            onWeaknessDetected: (userText, reply) async {
+              weaknessUserText = userText;
+              weaknessReply = reply;
             },
           ),
         ),
@@ -301,6 +311,11 @@ void main() {
     expect(sentMessage, 'Today I go gym after work.');
     expect(sentTarget, 'English');
     expect(sentScenario, '工作職場');
+    expect(weaknessUserText, 'Today I go gym after work.');
+    expect(
+      weaknessReply?.correction,
+      'I went to the gym after work today.',
+    );
     expect(
       find.text('I went to the gym after work. How about you?'),
       findsOneWidget,
@@ -682,6 +697,98 @@ void main() {
 
     await store.clear();
     expect(await store.load(), isNull);
+  });
+
+  test('WeaknessClassifier detects tense and ignores neutral tips', () {
+    const tenseReply = AiCoachReply(
+      reply: 'I went to the gym.',
+      correction: 'I went to the gym today.',
+      explanation: '描述已經發生的事情時，要用過去式 went。',
+      translation: '我今天去健身房了。',
+    );
+    const neutralReply = AiCoachReply(
+      reply: 'Sounds good!',
+      correction: '',
+      explanation: '自然回覆。',
+      translation: '聽起來不錯！',
+    );
+
+    expect(WeaknessClassifier.classify(tenseReply), '時態');
+    expect(WeaknessClassifier.classify(neutralReply), isNull);
+  });
+
+  test('WeaknessStore aggregates repeated categories', () async {
+    const store = WeaknessStore();
+
+    var records = await store.record(
+      category: '時態',
+      example: 'Today I go gym.',
+      correction: 'Today I went to the gym.',
+      explanation: '要用過去式。',
+      now: DateTime.utc(2026, 9, 27, 1),
+    );
+    records = await store.record(
+      category: '時態',
+      example: 'Yesterday I go home early.',
+      correction: 'Yesterday I went home early.',
+      explanation: 'Yesterday 要搭配過去式。',
+      now: DateTime.utc(2026, 9, 27, 2),
+    );
+
+    expect(records, hasLength(1));
+    expect(records.first.category, '時態');
+    expect(records.first.count, 2);
+    expect(records.first.example, 'Yesterday I go home early.');
+
+    await store.clear();
+    expect(await store.load(), isEmpty);
+  });
+
+  testWidgets('ProfileScreen shows tracked language weaknesses',
+      (tester) async {
+    final weaknesses = [
+      WeaknessRecord(
+        category: '時態',
+        count: 3,
+        example: 'Today I go gym.',
+        correction: 'Today I went to the gym.',
+        explanation: '描述已經發生的事情時，要用過去式。',
+        lastSeenAt: DateTime.utc(2026, 9, 27, 2),
+      ),
+      WeaknessRecord(
+        category: '冠詞',
+        count: 1,
+        example: 'I went to store.',
+        correction: 'I went to the store.',
+        explanation: '特定地點前加 the。',
+        lastSeenAt: DateTime.utc(2026, 9, 27, 1),
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(
+          items: const [],
+          isLoading: false,
+          weaknesses: weaknesses,
+          isLoadingWeaknesses: false,
+          onOpenBackup: () {},
+        ),
+      ),
+    );
+
+    await tester.scrollUntilVisible(
+      find.text('常見弱點'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('常見弱點'), findsOneWidget);
+    expect(find.text('時態'), findsOneWidget);
+    expect(find.text('3 次'), findsOneWidget);
+    expect(find.text('冠詞'), findsOneWidget);
+    expect(find.text('1 次'), findsOneWidget);
   });
 
   testWidgets('HomeScreen shows real due-review state', (tester) async {

@@ -18,16 +18,22 @@ typedef AiCoachSender = Future<AiCoachReply> Function(
 );
 
 typedef ChatLearningSaver = Future<bool> Function(String text);
+typedef ChatWeaknessRecorder = Future<void> Function(
+  String userText,
+  AiCoachReply reply,
+);
 
 class AiChatScreen extends StatefulWidget {
   final AiCoachSender onSend;
   final ChatLearningSaver onSaveLearning;
+  final ChatWeaknessRecorder? onWeaknessDetected;
   final AiChatStore chatStore;
 
   const AiChatScreen({
     super.key,
     required this.onSend,
     required this.onSaveLearning,
+    this.onWeaknessDetected,
     this.chatStore = const AiChatStore(),
   });
 
@@ -450,6 +456,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ),
         );
       });
+
+      final weaknessRecorder = widget.onWeaknessDetected;
+      if (weaknessRecorder != null) {
+        unawaited(weaknessRecorder(message, reply));
+      }
+
       unawaited(_persistConversationSafely());
       _scrollToBottom();
     } catch (error) {
