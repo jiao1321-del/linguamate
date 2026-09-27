@@ -27,6 +27,7 @@ class AiChatScreen extends StatefulWidget {
   final AiCoachSender onSend;
   final ChatLearningSaver onSaveLearning;
   final ChatWeaknessRecorder? onWeaknessDetected;
+  final ValueChanged<AiCoachReply>? onLearningPackUpdated;
   final AiChatStore chatStore;
 
   const AiChatScreen({
@@ -34,6 +35,7 @@ class AiChatScreen extends StatefulWidget {
     required this.onSend,
     required this.onSaveLearning,
     this.onWeaknessDetected,
+    this.onLearningPackUpdated,
     this.chatStore = const AiChatStore(),
   });
 
@@ -538,6 +540,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (weaknessRecorder != null) {
         unawaited(weaknessRecorder(message, reply));
       }
+      widget.onLearningPackUpdated?.call(reply);
 
       unawaited(_persistConversationSafely());
       _scrollToBottom();
