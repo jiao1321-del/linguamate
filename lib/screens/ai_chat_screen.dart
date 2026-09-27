@@ -321,75 +321,152 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return items.sublist(items.length - 8);
   }
 
+  List<AiCoachVocabulary> _conversationVocabulary() {
+    final seen = <String>{};
+    final items = <AiCoachVocabulary>[];
+
+    for (final entry in _entries.reversed) {
+      final vocabulary = entry.reply?.vocabulary ?? const <AiCoachVocabulary>[];
+      for (final item in vocabulary) {
+        final key = item.term.trim().toLowerCase();
+        if (key.isEmpty || !seen.add(key)) continue;
+        items.add(item);
+        if (items.length >= 9) return items;
+      }
+    }
+
+    return items;
+  }
+
+  AiCoachGrammar? _latestGrammar() {
+    for (final entry in _entries.reversed) {
+      final grammar = entry.reply?.grammar;
+      if (grammar != null && grammar.isValid) return grammar;
+    }
+    return null;
+  }
+
   Future<void> _showConversationReview() async {
     if (_isRestoring || _isSending || _savingIndex != null) return;
 
     final items = _conversationReviewItems();
+    final vocabulary = _conversationVocabulary();
+    final grammar = _latestGrammar();
     final userTurns = _entries.where((entry) => entry.mine).length;
     final correctionCount =
         items.where((item) => item.reply.hasCorrection).length;
+    int? selectedChoice;
 
-    final selectedIndex = await showModalBottomSheet<int>(
+    final selectedText = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) {
-        final maxHeight = MediaQuery.sizeOf(context).height * 0.82;
+        final maxHeight = MediaQuery.sizeOf(context).height * 0.86;
 
-        return SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxHeight),
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-              children: [
-                Text(
-                  '本次對話回顧',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$userTurns 個對話回合 · $correctionCount 個修正重點',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF756B82),
-                      ),
-                ),
-                const SizedBox(height: 14),
-                if (items.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8F5FC),
-                      borderRadius: BorderRadius.circular(16),
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxHeight),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                  children: [
+                    Text(
+                      '本次學習包',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
                     ),
-                    child: const Text(
-                      '目前還沒有需要整理的學習重點。再和 Shili 多聊幾句後回來看看 ✨',
+                    const SizedBox(height: 4),
+                    Text(
+                      '$userTurns 個對話回合 · ${vocabulary.length} 個單字/片語 · $correctionCount 個修正重點',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF756B82),
+                          ),
                     ),
-                  )
-                else
-                  for (var position = 0;
-                      position < items.length;
-                      position++) ...[
-                    _ConversationReviewCard(
-                      item: items[position],
-                      onSave: () => Navigator.of(context).pop(
-                        items[position].entryIndex,
+                    const SizedBox(height: 16),
+                    Text(
+                      '📚 單字量擴充',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (vocabulary.isEmpty)
+                      const _LearningPackEmpty(
+                        text: '再和 Shili 聊一句，就會依對話自動整理 3 個實用單字或片語。',
+                      )
+                    else
+                      for (final item in vocabulary) ...[
+                        _VocabularyCard(
+                          item: item,
+                          onSave: () => Navigator.of(context).pop(item.term),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      '🧩 文法加強',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (grammar == null)
+                      const _LearningPackEmpty(
+                        text: '下一輪對話後，Shili 會依你的句子準備一個文法重點和小練習。',
+                      )
+                    else
+                      _GrammarPracticeCard(
+                        grammar: grammar,
+                        selectedChoice: selectedChoice,
+                        onSelect: (index) {
+                          setSheetState(() => selectedChoice = index);
+                        },
                       ),
+                    const SizedBox(height: 18),
+                    Text(
+                      '📝 對話修正',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
                     ),
-                    if (position != items.length - 1)
-                      const SizedBox(height: 10),
+                    const SizedBox(height: 8),
+                    if (items.isEmpty)
+                      const _LearningPackEmpty(
+                        text: '目前沒有需要整理的修正，繼續自然聊天就好 ✨',
+                      )
+                    else
+                      for (var position = 0;
+                          position < items.length;
+                          position++) ...[
+                        _ConversationReviewCard(
+                          item: items[position],
+                          onSave: () {
+                            final reply = items[position].reply;
+                            Navigator.of(context).pop(
+                              reply.hasCorrection
+                                  ? reply.correction
+                                  : reply.reply,
+                            );
+                          },
+                        ),
+                        if (position != items.length - 1)
+                          const SizedBox(height: 10),
+                      ],
                   ],
-              ],
-            ),
-          ),
+                ),
+              ),
+            );
+          },
         );
       },
     );
 
-    if (!mounted || selectedIndex == null) return;
-    await _saveLearningEntry(selectedIndex);
+    if (!mounted || selectedText == null) return;
+    await _saveLearningText(selectedText);
   }
 
   Future<void> _clearConversation() async {
@@ -482,12 +559,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
     if (reply == null) return;
 
     final text = reply.hasCorrection ? reply.correction : reply.reply;
-    if (text.trim().isEmpty) return;
+    await _saveLearningText(text, savingIndex: index);
+  }
 
-    setState(() => _savingIndex = index);
+  Future<void> _saveLearningText(
+    String text, {
+    int savingIndex = -1,
+  }) async {
+    if (_savingIndex != null || text.trim().isEmpty) return;
+
+    setState(() => _savingIndex = savingIndex);
 
     try {
-      final added = await widget.onSaveLearning(text);
+      final added = await widget.onSaveLearning(text.trim());
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -495,7 +579,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           content: Text(
             added
                 ? '已變成鎏金學習卡並加入收藏 ✨'
-                : '這個句子已經收藏過了。',
+                : '這個內容已經收藏過了。',
           ),
         ),
       );
@@ -666,6 +750,195 @@ class _ConversationReviewItem {
     required this.userText,
     required this.reply,
   });
+}
+
+class _LearningPackEmpty extends StatelessWidget {
+  final String text;
+
+  const _LearningPackEmpty({
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F5FC),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF756B82),
+            ),
+      ),
+    );
+  }
+}
+
+class _VocabularyCard extends StatelessWidget {
+  final AiCoachVocabulary item;
+  final VoidCallback onSave;
+
+  const _VocabularyCard({
+    required this.item,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: ValueKey('vocabulary-card-${item.term}'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.term,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.chinese,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF6F667B),
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.example,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  if (item.exampleChinese.trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      item.exampleChinese,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF756B82),
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            IconButton(
+              key: ValueKey('save-vocabulary-${item.term}'),
+              tooltip: '加入我的學習',
+              onPressed: onSave,
+              icon: const GildedCardIcon(width: 18, height: 24),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GrammarPracticeCard extends StatelessWidget {
+  final AiCoachGrammar grammar;
+  final int? selectedChoice;
+  final ValueChanged<int> onSelect;
+
+  const _GrammarPracticeCard({
+    required this.grammar,
+    required this.selectedChoice,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final answered = selectedChoice != null;
+    final isCorrect = selectedChoice == grammar.answerIndex;
+
+    return Card(
+      key: const ValueKey('grammar-practice-card'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              grammar.title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(grammar.explanation),
+            const SizedBox(height: 12),
+            Text(
+              '小練習',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(grammar.question),
+            const SizedBox(height: 8),
+            for (var index = 0; index < grammar.choices.length; index++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: InkWell(
+                  key: ValueKey('grammar-choice-$index'),
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => onSelect(index),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selectedChoice == index
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : const Color(0xFFF8F5FC),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selectedChoice == index
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_off_rounded,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(grammar.choices[index])),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            if (answered) ...[
+              const SizedBox(height: 6),
+              Container(
+                key: const ValueKey('grammar-answer-feedback'),
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F5FC),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${isCorrect ? '✅ 答對了' : '💡 再記一下'}\n${grammar.answerExplanation}',
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ConversationReviewCard extends StatelessWidget {
