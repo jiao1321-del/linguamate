@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 
 import 'models/ai_coach_reply.dart';
+import 'models/daily_training.dart';
 import 'models/language_analysis.dart';
 import 'models/learning_item.dart';
 import 'models/weakness_record.dart';
 import 'screens/ai_chat_screen.dart';
 import 'screens/backup_screen.dart';
+import 'screens/daily_training_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/review_screen.dart';
 import 'screens/saved_screen.dart';
 import 'services/ai_chat_service.dart';
+import 'services/ai_chat_store.dart';
+import 'services/daily_training_plan_builder.dart';
+import 'services/daily_training_store.dart';
 import 'services/language_analysis_service.dart';
 import 'services/learning_store.dart';
 import 'services/weakness_classifier.dart';
@@ -50,19 +55,24 @@ class _MainShellState extends State<MainShell> {
   final _learningStore = LearningStore();
   final _analysisService = LanguageAnalysisService();
   final _aiChatService = AiChatService();
+  final _aiChatStore = const AiChatStore();
   final _weaknessStore = const WeaknessStore();
+  final _dailyTrainingStore = const DailyTrainingStore();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
   bool _isLoadingWeaknesses = true;
   List<LearningItem> _savedItems = const [];
   List<WeaknessRecord> _weaknesses = const [];
+  List<AiCoachReply> _coachReplies = const [];
+  DailyTrainingSummary? _dailyTrainingSummary;
 
   @override
   void initState() {
     super.initState();
     _loadSavedItems();
     _loadWeaknesses();
+    _loadTrainingContext();
   }
 
   Future<void> _loadSavedItems() async {
@@ -101,6 +111,74 @@ class _MainShellState extends State<MainShell> {
         _isLoadingWeaknesses = false;
       });
     }
+  }
+
+  Future<void> _loadTrainingContext() async {
+    final chatState = await _aiChatStore.load();
+    final summary = await _dailyTrainingStore.load();
+    if (!mounted) return;
+
+    final replies = chatState?.messages
+            .map((message) => message.reply)
+            .whereType<AiCoachReply>()
+            .toList(growable: false) ??
+        const <AiCoachReply>[];
+
+    setState(() {
+      _coachReplies = replies;
+      _dailyTrainingSummary = summary;
+    });
+  }
+
+  void _captureLearningPack(AiCoachReply reply) {
+    if (!mounted) return;
+
+    final updated = [..._coachReplies, reply];
+    setState(() {
+      _coachReplies = updated.length <= 20
+          ? updated
+          : updated.sublist(updated.length - 20);
+    });
+  }
+
+  DailyTrainingPlan _buildDailyTrainingPlan() {
+    return DailyTrainingPlanBuilder.build(
+      learningItems: _savedItems,
+      weaknesses: _weaknesses,
+      coachReplies: _coachReplies,
+    );
+  }
+
+  Future<void> _completeDailyTraining(
+    DailyTrainingSummary summary,
+  ) async {
+    await _dailyTrainingStore.save(summary);
+    if (!mounted) return;
+    setState(() => _dailyTrainingSummary = summary);
+  }
+
+  Future<void> _startDailyTraining() async {
+    final plan = _buildDailyTrainingPlan();
+
+    if (plan.tasks.isEmpty) {
+      _openPage(2);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('先和 Shili 聊幾句，我就能幫你建立個人化每日訓練 ✨'),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => DailyTrainingScreen(
+          plan: plan,
+          onReviewResult: _recordReviewResult,
+          onCompleted: _completeDailyTraining,
+        ),
+      ),
+    );
   }
 
   Future<bool> _saveLearningItem(
@@ -286,10 +364,18 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final dailyPlan = _buildDailyTrainingPlan();
+    final dailyCompleted =
+        _dailyTrainingSummary?.isForDate(DateTime.now()) == true;
+
     final pages = [
       HomeScreen(
         items: _savedItems,
         isLoading: _isLoadingSavedItems,
+        dailyTrainingTaskCount: dailyPlan.totalTasks,
+        dailyTrainingEstimatedMinutes: dailyPlan.estimatedMinutes,
+        dailyTrainingCompleted: dailyCompleted,
+        onStartDailyTraining: _startDailyTraining,
         onStartReview: _startReview,
       ),
       LearnScreen(
@@ -301,6 +387,7 @@ class _MainShellState extends State<MainShell> {
         onSend: _aiChatService.send,
         onSaveLearning: _saveChatLearningItem,
         onWeaknessDetected: _recordChatWeakness,
+        onLearningPackUpdated: _captureLearningPack,
       ),
       SavedScreen(
         items: _savedItems,
