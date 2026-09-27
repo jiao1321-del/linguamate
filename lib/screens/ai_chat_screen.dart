@@ -284,6 +284,108 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
+  List<_ConversationReviewItem> _conversationReviewItems() {
+    final items = <_ConversationReviewItem>[];
+    String? latestUserText;
+
+    for (var index = 0; index < _entries.length; index++) {
+      final entry = _entries[index];
+      if (entry.mine) {
+        latestUserText = entry.text;
+        continue;
+      }
+
+      final reply = entry.reply;
+      if (reply == null) continue;
+
+      final hasLearningPoint =
+          reply.hasCorrection || reply.explanation.trim().isNotEmpty;
+      if (!hasLearningPoint) continue;
+
+      items.add(
+        _ConversationReviewItem(
+          entryIndex: index,
+          userText: latestUserText ?? '',
+          reply: reply,
+        ),
+      );
+    }
+
+    if (items.length <= 8) return items;
+    return items.sublist(items.length - 8);
+  }
+
+  Future<void> _showConversationReview() async {
+    if (_isRestoring || _isSending || _savingIndex != null) return;
+
+    final items = _conversationReviewItems();
+    final userTurns = _entries.where((entry) => entry.mine).length;
+    final correctionCount =
+        items.where((item) => item.reply.hasCorrection).length;
+
+    final selectedIndex = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        final maxHeight = MediaQuery.sizeOf(context).height * 0.82;
+
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+              children: [
+                Text(
+                  '本次對話回顧',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$userTurns 個對話回合 · $correctionCount 個修正重點',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF756B82),
+                      ),
+                ),
+                const SizedBox(height: 14),
+                if (items.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F5FC),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Text(
+                      '目前還沒有需要整理的學習重點。再和 Shili 多聊幾句後回來看看 ✨',
+                    ),
+                  )
+                else
+                  for (var position = 0;
+                      position < items.length;
+                      position++) ...[
+                    _ConversationReviewCard(
+                      item: items[position],
+                      onSave: () => Navigator.of(context).pop(
+                        items[position].entryIndex,
+                      ),
+                    ),
+                    if (position != items.length - 1)
+                      const SizedBox(height: 10),
+                  ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selectedIndex == null) return;
+    await _saveLearningEntry(selectedIndex);
+  }
+
   Future<void> _clearConversation() async {
     if (_isRestoring || _isSending || _savingIndex != null) return;
 
@@ -432,6 +534,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             onLanguageSelected: _changeTarget,
             onScenarioSelected: _changeScenario,
             onStarterIdeas: _showStarterIdeas,
+            onReviewConversation: _showConversationReview,
             onClearConversation: _clearConversation,
           ),
           const SizedBox(height: 4),
@@ -536,6 +639,100 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ConversationReviewItem {
+  final int entryIndex;
+  final String userText;
+  final AiCoachReply reply;
+
+  const _ConversationReviewItem({
+    required this.entryIndex,
+    required this.userText,
+    required this.reply,
+  });
+}
+
+class _ConversationReviewCard extends StatelessWidget {
+  final _ConversationReviewItem item;
+  final VoidCallback onSave;
+
+  const _ConversationReviewCard({
+    required this.item,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final reply = item.reply;
+
+    return Card(
+      key: ValueKey('conversation-review-card-${item.entryIndex}'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (item.userText.trim().isNotEmpty) ...[
+              Text(
+                '你說',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: const Color(0xFF756B82),
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(item.userText),
+              const SizedBox(height: 10),
+            ],
+            if (reply.hasCorrection) ...[
+              Text(
+                '✨ 更自然',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(reply.correction),
+              const SizedBox(height: 10),
+            ],
+            if (reply.explanation.trim().isNotEmpty) ...[
+              Text(
+                '💡 學習重點',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(reply.explanation),
+              const SizedBox(height: 10),
+            ],
+            if (reply.translation.trim().isNotEmpty) ...[
+              Text(
+                '🇹🇼 Shili 中文',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(reply.translation),
+              const SizedBox(height: 12),
+            ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.tonalIcon(
+                key: ValueKey('review-save-${item.entryIndex}'),
+                onPressed: onSave,
+                icon: const GildedCardIcon(width: 18, height: 24),
+                label: const Text('加入我的學習'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

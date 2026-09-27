@@ -11,6 +11,7 @@ class ShiliCoachHeader extends StatelessWidget {
   final ValueChanged<String> onLanguageSelected;
   final ValueChanged<String> onScenarioSelected;
   final VoidCallback onStarterIdeas;
+  final VoidCallback onReviewConversation;
   final VoidCallback onClearConversation;
 
   const ShiliCoachHeader({
@@ -23,6 +24,7 @@ class ShiliCoachHeader extends StatelessWidget {
     required this.onLanguageSelected,
     required this.onScenarioSelected,
     required this.onStarterIdeas,
+    required this.onReviewConversation,
     required this.onClearConversation,
   });
 
@@ -146,7 +148,14 @@ class ShiliCoachHeader extends StatelessWidget {
                 onPressed: enabled ? onStarterIdeas : null,
                 icon: const Icon(Icons.lightbulb_outline_rounded),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 2),
+              IconButton(
+                key: const ValueKey('conversation-review-button'),
+                tooltip: '本次回顧',
+                visualDensity: VisualDensity.compact,
+                onPressed: enabled ? onReviewConversation : null,
+                icon: const Icon(Icons.fact_check_outlined),
+              ),
               IconButton(
                 key: const ValueKey('clear-chat-button'),
                 tooltip: '清除對話',

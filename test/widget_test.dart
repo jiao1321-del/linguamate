@@ -250,6 +250,13 @@ void main() {
     expect(
       find.descendant(
         of: coachPanel,
+        matching: find.byKey(const ValueKey('conversation-review-button')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: coachPanel,
         matching: find.byKey(const ValueKey('clear-chat-button')),
       ),
       findsOneWidget,
@@ -380,6 +387,86 @@ void main() {
       find.text('Let’s check the production line issue together.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('conversation review collects correction and can save it',
+      (tester) async {
+    String? savedText;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiChatScreen(
+            onSend: (message, targetLanguage, scenario, history) async {
+              return const AiCoachReply(
+                reply: 'The machine stopped during inspection.',
+                correction: 'The machine stopped during the inspection.',
+                explanation: '特定的檢驗流程前面加 the 會更自然。',
+                translation: '機台在檢驗過程中停止了。',
+              );
+            },
+            onSaveLearning: (text) async {
+              savedText = text;
+              return true;
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'The machine stopped during inspection.',
+    );
+    await tester.tap(find.byKey(const ValueKey('send-chat-message')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('conversation-review-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('本次對話回顧'), findsOneWidget);
+    expect(find.text('1 個對話回合 · 1 個修正重點'), findsOneWidget);
+    final reviewCard = find.byKey(
+      const ValueKey('conversation-review-card-2'),
+    );
+    expect(reviewCard, findsOneWidget);
+    expect(
+      find.descendant(
+        of: reviewCard,
+        matching: find.text('The machine stopped during inspection.'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: reviewCard,
+        matching: find.text('The machine stopped during the inspection.'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: reviewCard,
+        matching: find.text('特定的檢驗流程前面加 the 會更自然。'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: reviewCard,
+        matching: find.text('機台在檢驗過程中停止了。'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('review-save-2')));
+    await tester.pumpAndSettle();
+
+    expect(savedText, 'The machine stopped during the inspection.');
+    expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
   });
 
   testWidgets('AI chat can send from the keyboard send action',
