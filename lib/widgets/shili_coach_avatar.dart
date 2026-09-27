@@ -13,7 +13,7 @@ class ShiliCoachAvatar extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      padding: EdgeInsets.all(size * 0.05),
+      padding: EdgeInsets.all(size * 0.045),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const LinearGradient(
@@ -39,7 +39,8 @@ class ShiliCoachAvatar extends StatelessWidget {
       ),
       child: ClipOval(
         child: Image.asset(
-          'web/icons/Shili-192-v052.png',
+          'assets/images/shili_avatar_v14.jpg',
+          key: const ValueKey('shili-avatar-v14'),
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             return Container(
