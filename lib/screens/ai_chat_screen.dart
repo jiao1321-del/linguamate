@@ -752,6 +752,195 @@ class _ConversationReviewItem {
   });
 }
 
+class _LearningPackEmpty extends StatelessWidget {
+  final String text;
+
+  const _LearningPackEmpty({
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F5FC),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF756B82),
+            ),
+      ),
+    );
+  }
+}
+
+class _VocabularyCard extends StatelessWidget {
+  final AiCoachVocabulary item;
+  final VoidCallback onSave;
+
+  const _VocabularyCard({
+    required this.item,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: ValueKey('vocabulary-card-${item.term}'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.term,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.chinese,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF6F667B),
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.example,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  if (item.exampleChinese.trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      item.exampleChinese,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF756B82),
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            IconButton(
+              key: ValueKey('save-vocabulary-${item.term}'),
+              tooltip: '加入我的學習',
+              onPressed: onSave,
+              icon: const GildedCardIcon(width: 18, height: 24),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GrammarPracticeCard extends StatelessWidget {
+  final AiCoachGrammar grammar;
+  final int? selectedChoice;
+  final ValueChanged<int> onSelect;
+
+  const _GrammarPracticeCard({
+    required this.grammar,
+    required this.selectedChoice,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final answered = selectedChoice != null;
+    final isCorrect = selectedChoice == grammar.answerIndex;
+
+    return Card(
+      key: const ValueKey('grammar-practice-card'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              grammar.title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(grammar.explanation),
+            const SizedBox(height: 12),
+            Text(
+              '小練習',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(grammar.question),
+            const SizedBox(height: 8),
+            for (var index = 0; index < grammar.choices.length; index++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: InkWell(
+                  key: ValueKey('grammar-choice-$index'),
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => onSelect(index),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selectedChoice == index
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : const Color(0xFFF8F5FC),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selectedChoice == index
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_off_rounded,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(grammar.choices[index])),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            if (answered) ...[
+              const SizedBox(height: 6),
+              Container(
+                key: const ValueKey('grammar-answer-feedback'),
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F5FC),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${isCorrect ? '✅ 答對了' : '💡 再記一下'}\n${grammar.answerExplanation}',
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ConversationReviewCard extends StatelessWidget {
   final _ConversationReviewItem item;
   final VoidCallback onSave;
