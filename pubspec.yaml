@@ -1,7 +1,7 @@
 name: linguamate
 description: A personal AI language learning app.
 publish_to: "none"
-version: 1.13.0+36
+version: 1.14.0+37
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -22,3 +22,5 @@ flutter:
   uses-material-design: true
   assets:
     - web/icons/Shili-192-v052.png
+    - assets/images/shili_coach_card_v14.jpg
+    - assets/images/shili_avatar_v14.jpg
