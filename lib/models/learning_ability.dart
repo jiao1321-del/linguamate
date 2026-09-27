@@ -35,7 +35,10 @@ class LearningAbilityRecord {
     if (attempts == 0) return 0;
     final accuracyScore = accuracy * 80;
     final experienceScore = (attempts.clamp(0, 5) / 5) * 20;
-    return (accuracyScore + experienceScore).round().clamp(0, 100);
+    return (accuracyScore + experienceScore)
+        .round()
+        .clamp(0, 100)
+        .toInt();
   }
 
   AbilityStatus get status {
