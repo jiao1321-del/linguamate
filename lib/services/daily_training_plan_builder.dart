@@ -12,15 +12,18 @@ class DailyTrainingPlanBuilder {
     required List<WeaknessRecord> weaknesses,
     required List<AiCoachReply> coachReplies,
     List<MistakeRecord> mistakes = const <MistakeRecord>[],
+    String? priorityType,
     DateTime? now,
   }) {
     final tasks = <DailyTrainingTask>[];
     final activeMistakes = mistakes.where((item) => item.isActive).take(3);
 
     for (final mistake in activeMistakes) {
-      tasks.add(mistake.toTask());
+      _addUnique(tasks, mistake.toTask());
     }
+
     final referenceTime = now ?? DateTime.now();
+    final candidates = <DailyTrainingTask>[];
 
     final vocabulary = _recentVocabulary(coachReplies);
     final vocabularyMeanings = vocabulary
@@ -29,12 +32,7 @@ class DailyTrainingPlanBuilder {
         .toSet()
         .toList(growable: false);
 
-    var vocabularyAdded = 0;
-    for (var index = 0;
-        index < vocabulary.length &&
-            vocabularyAdded < 3 &&
-            tasks.length < 10;
-        index++) {
+    for (var index = 0; index < vocabulary.length && index < 3; index++) {
       final item = vocabulary[index];
       final options = <String>[
         item.chinese,
@@ -48,11 +46,10 @@ class DailyTrainingPlanBuilder {
           ...options.take(offset),
         ];
         final correctIndex = rotated.indexOf(item.chinese);
-        final taskId = 'vocab-${item.term.toLowerCase()}';
-        if (tasks.any((task) => task.id == taskId)) continue;
-        tasks.add(
+        _addUnique(
+          candidates,
           DailyTrainingTask(
-            id: taskId,
+            id: 'vocab-${item.term.toLowerCase()}',
             type: 'vocabulary',
             title: '單字・片語',
             prompt: item.term,
@@ -69,13 +66,11 @@ class DailyTrainingPlanBuilder {
             ),
           ),
         );
-        vocabularyAdded++;
       } else {
-        final taskId = 'vocab-${item.term.toLowerCase()}';
-        if (tasks.any((task) => task.id == taskId)) continue;
-        tasks.add(
+        _addUnique(
+          candidates,
           DailyTrainingTask(
-            id: taskId,
+            id: 'vocab-${item.term.toLowerCase()}',
             type: 'vocabulary',
             title: '單字・片語',
             prompt: item.term,
@@ -90,20 +85,16 @@ class DailyTrainingPlanBuilder {
             ),
           ),
         );
-        vocabularyAdded++;
       }
     }
 
     final grammarItems = _recentGrammar(coachReplies);
-    for (var index = 0;
-        index < grammarItems.length && index < 2 && tasks.length < 10;
-        index++) {
+    for (var index = 0; index < grammarItems.length && index < 2; index++) {
       final grammar = grammarItems[index];
-      final taskId = 'grammar-${grammar.title.toLowerCase()}';
-      if (tasks.any((task) => task.id == taskId)) continue;
-      tasks.add(
+      _addUnique(
+        candidates,
         DailyTrainingTask(
-          id: taskId,
+          id: 'grammar-${grammar.title.toLowerCase()}',
           type: 'grammar',
           title: '文法加強 · ${grammar.title}',
           prompt: grammar.question,
@@ -116,19 +107,16 @@ class DailyTrainingPlanBuilder {
       );
     }
 
-    for (var index = 0;
-        index < weaknesses.length && index < 2 && tasks.length < 10;
-        index++) {
+    for (var index = 0; index < weaknesses.length && index < 2; index++) {
       final weakness = weaknesses[index];
       final prompt = weakness.example.trim();
       final correction = weakness.correction.trim();
       if (prompt.isEmpty || correction.isEmpty) continue;
 
-      final taskId = 'weakness-${weakness.category}-$index';
-      if (tasks.any((task) => task.id == taskId)) continue;
-      tasks.add(
+      _addUnique(
+        candidates,
         DailyTrainingTask(
-          id: taskId,
+          id: 'weakness-${weakness.category}-$index',
           type: 'weakness',
           title: '弱點加強 · ${weakness.category}',
           prompt: prompt,
@@ -147,12 +135,10 @@ class DailyTrainingPlanBuilder {
         .take(3);
 
     for (final item in dueItems) {
-      if (tasks.length >= 10) break;
-      final taskId = 'review-${item.id}';
-      if (tasks.any((task) => task.id == taskId)) continue;
-      tasks.add(
+      _addUnique(
+        candidates,
         DailyTrainingTask(
-          id: taskId,
+          id: 'review-${item.id}',
           type: 'review',
           title: 'SRS 複習',
           prompt: item.text,
@@ -161,6 +147,19 @@ class DailyTrainingPlanBuilder {
           learningItemId: item.id,
         ),
       );
+    }
+
+    if (priorityType != null && priorityType.trim().isNotEmpty) {
+      candidates.sort((a, b) {
+        final aPriority = a.type == priorityType ? 0 : 1;
+        final bPriority = b.type == priorityType ? 0 : 1;
+        return aPriority.compareTo(bPriority);
+      });
+    }
+
+    for (final candidate in candidates) {
+      if (tasks.length >= 10) break;
+      _addUnique(tasks, candidate);
     }
 
     return DailyTrainingPlan(
@@ -226,5 +225,13 @@ class DailyTrainingPlanBuilder {
       }
     }
     return null;
+  }
+
+  static void _addUnique(
+    List<DailyTrainingTask> tasks,
+    DailyTrainingTask task,
+  ) {
+    if (tasks.any((item) => item.id == task.id)) return;
+    tasks.add(task);
   }
 }
