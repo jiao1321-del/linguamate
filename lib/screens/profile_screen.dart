@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/learning_item.dart';
+import '../models/learning_ability.dart';
 import '../models/mistake_record.dart';
 import '../models/weakness_record.dart';
 
@@ -10,6 +11,7 @@ class ProfileScreen extends StatelessWidget {
   final List<WeaknessRecord> weaknesses;
   final bool isLoadingWeaknesses;
   final List<MistakeRecord> mistakes;
+  final LearningAbilityReport abilityReport;
   final VoidCallback? onPracticeMistakes;
   final VoidCallback onOpenBackup;
 
@@ -20,6 +22,9 @@ class ProfileScreen extends StatelessWidget {
     this.weaknesses = const <WeaknessRecord>[],
     this.isLoadingWeaknesses = false,
     this.mistakes = const <MistakeRecord>[],
+    this.abilityReport = const LearningAbilityReport(
+      records: <LearningAbilityRecord>[],
+    ),
     this.onPracticeMistakes,
     required this.onOpenBackup,
   });
@@ -135,6 +140,95 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            key: const ValueKey('learning-ability-card'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.insights_rounded,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '學習能力',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                        ),
+                      ),
+                      if (abilityReport.totalAttempts > 0)
+                        Text(
+                          '答對率 ${abilityReport.overallAccuracy}%',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _AbilitySummaryBox(
+                          label: '已掌握',
+                          value: abilityReport.masteredCount,
+                          icon: Icons.verified_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _AbilitySummaryBox(
+                          label: '學習中',
+                          value: abilityReport.learningCount,
+                          icon: Icons.auto_graph_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _AbilitySummaryBox(
+                          label: '待加強',
+                          value: abilityReport.needsWorkCount,
+                          icon: Icons.priority_high_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (abilityReport.records.isEmpty)
+                    const Text(
+                      '完成每日訓練後，這裡會開始統計答對率、錯誤次數與熟練度。',
+                    )
+                  else ...[
+                    if (abilityReport.priorityLabel != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8F5FC),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          '🎯 目前優先加強：${abilityReport.priorityLabel}',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    for (final ability in abilityReport.ranked.take(5)) ...[
+                      _AbilityProgressRow(ability: ability),
+                      if (ability != abilityReport.ranked.take(5).last)
+                        const Divider(height: 16),
+                    ],
+                  ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 18),
@@ -315,6 +409,103 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AbilitySummaryBox extends StatelessWidget {
+  final String label;
+  final int value;
+  final IconData icon;
+
+  const _AbilitySummaryBox({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F5FC),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(height: 4),
+          Text(
+            value.toString(),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AbilityProgressRow extends StatelessWidget {
+  final LearningAbilityRecord ability;
+
+  const _AbilityProgressRow({
+    required this.ability,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accuracy = (ability.accuracy * 100).round();
+    final recent = ability.lastResultCorrect == null
+        ? ''
+        : ability.lastResultCorrect!
+            ? ' · 最近答對'
+            : ' · 最近答錯';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                ability.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              ability.statusLabel,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        LinearProgressIndicator(
+          value: ability.score / 100,
+          minHeight: 6,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '熟練度 ${ability.score}% · 答對率 $accuracy% · ${ability.attempts} 題 · 錯 ${ability.wrongCount} 次$recent',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF756B82),
+              ),
+        ),
+      ],
     );
   }
 }

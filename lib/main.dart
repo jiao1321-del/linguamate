@@ -4,6 +4,7 @@ import 'models/ai_coach_reply.dart';
 import 'models/daily_training.dart';
 import 'models/language_analysis.dart';
 import 'models/learning_item.dart';
+import 'models/learning_ability.dart';
 import 'models/mistake_record.dart';
 import 'models/weakness_record.dart';
 import 'screens/ai_chat_screen.dart';
@@ -19,6 +20,8 @@ import 'services/ai_chat_store.dart';
 import 'services/daily_training_plan_builder.dart';
 import 'services/daily_training_store.dart';
 import 'services/language_analysis_service.dart';
+import 'services/learning_ability_analyzer.dart';
+import 'services/learning_ability_store.dart';
 import 'services/learning_store.dart';
 import 'services/mistake_store.dart';
 import 'services/weakness_classifier.dart';
@@ -61,6 +64,7 @@ class _MainShellState extends State<MainShell> {
   final _weaknessStore = const WeaknessStore();
   final _dailyTrainingStore = const DailyTrainingStore();
   final _mistakeStore = const MistakeStore();
+  final _learningAbilityStore = const LearningAbilityStore();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
@@ -69,6 +73,7 @@ class _MainShellState extends State<MainShell> {
   List<WeaknessRecord> _weaknesses = const [];
   List<AiCoachReply> _coachReplies = const [];
   List<MistakeRecord> _mistakes = const [];
+  List<LearningAbilityRecord> _abilityRecords = const [];
   DailyTrainingSummary? _dailyTrainingSummary;
 
   @override
@@ -78,6 +83,7 @@ class _MainShellState extends State<MainShell> {
     _loadWeaknesses();
     _loadTrainingContext();
     _loadMistakes();
+    _loadLearningAbility();
   }
 
   Future<void> _loadSavedItems() async {
@@ -124,6 +130,20 @@ class _MainShellState extends State<MainShell> {
     setState(() => _mistakes = records);
   }
 
+  Future<void> _loadLearningAbility() async {
+    final records = await _learningAbilityStore.load();
+    if (!mounted) return;
+    setState(() => _abilityRecords = records);
+  }
+
+  LearningAbilityReport _buildAbilityReport() {
+    return LearningAbilityAnalyzer.build(
+      tracked: _abilityRecords,
+      mistakes: _mistakes,
+      weaknesses: _weaknesses,
+    );
+  }
+
   Future<void> _loadTrainingContext() async {
     final chatState = await _aiChatStore.load();
     final summary = await _dailyTrainingStore.load();
@@ -153,11 +173,13 @@ class _MainShellState extends State<MainShell> {
   }
 
   DailyTrainingPlan _buildDailyTrainingPlan() {
+    final abilityReport = _buildAbilityReport();
     return DailyTrainingPlanBuilder.build(
       learningItems: _savedItems,
       weaknesses: _weaknesses,
       coachReplies: _coachReplies,
       mistakes: _mistakes,
+      priorityType: abilityReport.priorityType,
     );
   }
 
@@ -165,12 +187,20 @@ class _MainShellState extends State<MainShell> {
     DailyTrainingTask task,
     bool correct,
   ) async {
-    final records = await _mistakeStore.recordResult(
+    final mistakes = await _mistakeStore.recordResult(
+      task: task,
+      correct: correct,
+    );
+    final abilities = await _learningAbilityStore.recordResult(
       task: task,
       correct: correct,
     );
     if (!mounted) return;
-    setState(() => _mistakes = records);
+
+    setState(() {
+      _mistakes = mistakes;
+      _abilityRecords = abilities;
+    });
   }
 
   Future<void> _startMistakeTraining() async {
@@ -411,6 +441,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final abilityReport = _buildAbilityReport();
     final dailyPlan = _buildDailyTrainingPlan();
     final dailyCompleted =
         _dailyTrainingSummary?.isForDate(DateTime.now()) == true;
@@ -422,6 +453,7 @@ class _MainShellState extends State<MainShell> {
         dailyTrainingTaskCount: dailyPlan.totalTasks,
         dailyTrainingEstimatedMinutes: dailyPlan.estimatedMinutes,
         dailyTrainingCompleted: dailyCompleted,
+        dailyTrainingFocusLabel: abilityReport.priorityLabel,
         onStartDailyTraining: _startDailyTraining,
         onStartReview: _startReview,
       ),
@@ -448,6 +480,7 @@ class _MainShellState extends State<MainShell> {
         weaknesses: _weaknesses,
         isLoadingWeaknesses: _isLoadingWeaknesses,
         mistakes: _mistakes,
+        abilityReport: abilityReport,
         onPracticeMistakes: _startMistakeTraining,
         onOpenBackup: _openBackup,
       ),
