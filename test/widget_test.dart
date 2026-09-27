@@ -931,6 +931,14 @@ void main() {
     expect(find.text('待複習'), findsOneWidget);
     expect(find.text('今日新增'), findsOneWidget);
     expect(find.text('未分類'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('今日任務'),
+      260,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('複習 1 個到期句子'), findsOneWidget);
     expect(find.text('開始今日複習'), findsOneWidget);
     expect(find.text('48m'), findsNothing);
