@@ -6,12 +6,20 @@ import '../widgets/stat_card.dart';
 class HomeScreen extends StatelessWidget {
   final List<LearningItem> items;
   final bool isLoading;
+  final int dailyTrainingTaskCount;
+  final int dailyTrainingEstimatedMinutes;
+  final bool dailyTrainingCompleted;
+  final VoidCallback? onStartDailyTraining;
   final VoidCallback onStartReview;
 
   const HomeScreen({
     super.key,
     required this.items,
     required this.isLoading,
+    this.dailyTrainingTaskCount = 0,
+    this.dailyTrainingEstimatedMinutes = 0,
+    this.dailyTrainingCompleted = false,
+    this.onStartDailyTraining,
     required this.onStartReview,
   });
 
@@ -93,6 +101,70 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
+          Card(
+            key: const ValueKey('daily-training-card'),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.school_outlined,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '今日訓練',
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                        ),
+                      ),
+                      if (dailyTrainingCompleted)
+                        const Icon(Icons.check_circle_rounded),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    dailyTrainingTaskCount == 0
+                        ? '先和 Shili 聊幾句或建立學習卡，系統就會自動安排。'
+                        : '$dailyTrainingTaskCount 題 · 約 $dailyTrainingEstimatedMinutes 分鐘',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    dailyTrainingCompleted
+                        ? '今天已完成；想加強的話可以再練一次。'
+                        : '依你的單字、文法、常見弱點與 SRS 到期內容自動安排。',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF756B82),
+                        ),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    key: const ValueKey('start-daily-training'),
+                    onPressed:
+                        dailyTrainingTaskCount > 0 ? onStartDailyTraining : null,
+                    icon: Icon(
+                      dailyTrainingCompleted
+                          ? Icons.replay_rounded
+                          : Icons.play_arrow_rounded,
+                    ),
+                    label: Text(
+                      dailyTrainingCompleted ? '再練一次' : '開始今日訓練',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(20),
