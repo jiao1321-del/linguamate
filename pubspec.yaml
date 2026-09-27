@@ -11,7 +11,8 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   http: ^1.2.2
-  js: ^0.7.2
+  flutter_tts: ^4.2.5
+  speech_to_text: ^7.5.0
   shared_preferences: ^2.5.3
 
 dev_dependencies:
