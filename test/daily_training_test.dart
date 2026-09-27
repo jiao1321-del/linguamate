@@ -5,15 +5,20 @@ import 'package:linguamate/models/daily_training.dart';
 import 'package:linguamate/models/language_analysis.dart';
 import 'package:linguamate/models/learning_item.dart';
 import 'package:linguamate/models/learning_ability.dart';
+import 'package:linguamate/models/learning_path.dart';
+import 'package:linguamate/models/learning_progress.dart';
 import 'package:linguamate/models/mistake_record.dart';
 import 'package:linguamate/models/weakness_record.dart';
 import 'package:linguamate/screens/daily_training_screen.dart';
 import 'package:linguamate/screens/home_screen.dart';
 import 'package:linguamate/screens/profile_screen.dart';
+import 'package:linguamate/screens/progress_center_screen.dart';
 import 'package:linguamate/services/daily_training_plan_builder.dart';
 import 'package:linguamate/services/daily_training_store.dart';
 import 'package:linguamate/services/learning_ability_analyzer.dart';
 import 'package:linguamate/services/learning_ability_store.dart';
+import 'package:linguamate/services/learning_path_planner.dart';
+import 'package:linguamate/services/learning_progress_store.dart';
 import 'package:linguamate/services/mistake_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -491,6 +496,192 @@ void main() {
     expect(find.text('待加強'), findsAtLeastNWidgets(1));
     expect(find.text('單字・片語'), findsOneWidget);
     expect(find.text('已掌握'), findsAtLeastNWidgets(1));
+  });
+
+  test('LearningProgressStore keeps training history and streak data',
+      () async {
+    const store = LearningProgressStore();
+    final first = DailyTrainingSummary(
+      dateKey: '2026-09-27',
+      totalTasks: 8,
+      correctTasks: 6,
+      completedAt: DateTime(2026, 9, 27, 9),
+      typeTotals: const {
+        'vocabulary': 4,
+        'grammar': 4,
+      },
+      typeCorrect: const {
+        'vocabulary': 4,
+        'grammar': 2,
+      },
+    );
+    final second = DailyTrainingSummary(
+      dateKey: '2026-09-28',
+      totalTasks: 10,
+      correctTasks: 8,
+      completedAt: DateTime(2026, 9, 28, 9),
+      typeTotals: const {
+        'vocabulary': 5,
+        'grammar': 5,
+      },
+      typeCorrect: const {
+        'vocabulary': 4,
+        'grammar': 4,
+      },
+    );
+
+    await store.append(first);
+    final history = await store.append(second);
+
+    expect(history, hasLength(2));
+
+    const abilityReport = LearningAbilityReport(
+      records: <LearningAbilityRecord>[],
+    );
+    final report = LearningProgressReport(
+      history: history,
+      abilityReport: abilityReport,
+      activeMistakeCount: 1,
+    );
+
+    expect(report.streakAt(DateTime(2026, 9, 28)), 2);
+    expect(report.totalTasks, 18);
+    expect(report.totalCorrect, 14);
+    expect(report.typeAccuracy('vocabulary'), 89);
+    expect(report.typeAccuracy('grammar'), 67);
+  });
+
+  testWidgets('ProgressCenterScreen shows progress metrics',
+      (tester) async {
+    final report = LearningProgressReport(
+      history: [
+        DailyTrainingSummary(
+          dateKey: '2026-09-28',
+          totalTasks: 10,
+          correctTasks: 8,
+          completedAt: DateTime.now(),
+          typeTotals: const {
+            'vocabulary': 5,
+            'grammar': 5,
+          },
+          typeCorrect: const {
+            'vocabulary': 4,
+            'grammar': 4,
+          },
+        ),
+      ],
+      abilityReport: const LearningAbilityReport(
+        records: <LearningAbilityRecord>[],
+      ),
+      activeMistakeCount: 2,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: ProgressCenterScreen(report: report)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('學習進度中心'), findsOneWidget);
+    expect(find.text('總答對率'), findsOneWidget);
+    expect(find.text('80%'), findsAtLeastNWidgets(1));
+    expect(find.byKey(const ValueKey('progress-skill-card')), findsOneWidget);
+  });
+
+  test('LearningPathPlanner creates three adaptive next steps', () {
+    final now = DateTime.utc(2026, 9, 28, 4);
+    final ability = LearningAbilityRecord(
+      key: 'grammar:過去式',
+      label: '過去式',
+      type: 'grammar',
+      attempts: 4,
+      correctCount: 1,
+      wrongCount: 3,
+      correctStreak: 0,
+      lastResultCorrect: false,
+      lastPracticedAt: now,
+    );
+    final mistake = MistakeRecord(
+      taskId: 'grammar-past',
+      type: 'grammar',
+      title: '文法加強 · 過去式',
+      prompt: 'Yesterday I ___ home.',
+      answer: 'went',
+      explanation: 'Yesterday 通常使用過去式。',
+      options: const ['go', 'went', 'going'],
+      correctIndex: 1,
+      wrongCount: 2,
+      correctStreak: 0,
+      lastWrongAt: now,
+    );
+
+    final abilityReport = LearningAbilityReport(records: [ability]);
+    final progressReport = LearningProgressReport(
+      history: const [],
+      abilityReport: abilityReport,
+      activeMistakeCount: 1,
+    );
+
+    final plan = LearningPathPlanner.build(
+      abilityReport: abilityReport,
+      progressReport: progressReport,
+      mistakes: [mistake],
+    );
+
+    expect(plan.steps, hasLength(3));
+    expect(plan.steps.first.title, '先補強 過去式');
+    expect(plan.steps[1].action, 'mistakes');
+    expect(plan.steps[2].action, 'roleplay');
+  });
+
+  testWidgets('HomeScreen renders personalized learning path',
+      (tester) async {
+    const plan = LearningPathPlan(
+      steps: [
+        LearningPathStep(
+          id: 'focus',
+          title: '先補強 過去式',
+          reason: '目前這是最需要優先處理的能力。',
+          action: 'daily',
+          actionLabel: '開始今日訓練',
+        ),
+        LearningPathStep(
+          id: 'roleplay',
+          title: '完成 1 個 AI 情境任務',
+          reason: '把能力放進真實情境。',
+          action: 'roleplay',
+          actionLabel: '進入情境任務',
+        ),
+      ],
+    );
+    String? action;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomeScreen(
+            items: const [],
+            isLoading: false,
+            learningStreak: 4,
+            learningPath: plan,
+            onLearningPathAction: (value) => action = value,
+            onStartReview: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('learning-path-card')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('我的學習路線'), findsOneWidget);
+    expect(find.text('先補強 過去式'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('learning-path-action-1')));
+    expect(action, 'roleplay');
   });
 
   test('DailyTrainingStore persists completion summary', () async {
