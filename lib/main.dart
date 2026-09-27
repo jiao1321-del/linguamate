@@ -5,6 +5,8 @@ import 'models/daily_training.dart';
 import 'models/language_analysis.dart';
 import 'models/learning_item.dart';
 import 'models/learning_ability.dart';
+import 'models/learning_path.dart';
+import 'models/learning_progress.dart';
 import 'models/mistake_record.dart';
 import 'models/weakness_record.dart';
 import 'screens/ai_chat_screen.dart';
@@ -13,6 +15,7 @@ import 'screens/daily_training_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/progress_center_screen.dart';
 import 'screens/review_screen.dart';
 import 'screens/saved_screen.dart';
 import 'services/ai_chat_service.dart';
@@ -22,6 +25,8 @@ import 'services/daily_training_store.dart';
 import 'services/language_analysis_service.dart';
 import 'services/learning_ability_analyzer.dart';
 import 'services/learning_ability_store.dart';
+import 'services/learning_path_planner.dart';
+import 'services/learning_progress_store.dart';
 import 'services/learning_store.dart';
 import 'services/mistake_store.dart';
 import 'services/weakness_classifier.dart';
@@ -65,6 +70,7 @@ class _MainShellState extends State<MainShell> {
   final _dailyTrainingStore = const DailyTrainingStore();
   final _mistakeStore = const MistakeStore();
   final _learningAbilityStore = const LearningAbilityStore();
+  final _learningProgressStore = const LearningProgressStore();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
@@ -74,6 +80,7 @@ class _MainShellState extends State<MainShell> {
   List<AiCoachReply> _coachReplies = const [];
   List<MistakeRecord> _mistakes = const [];
   List<LearningAbilityRecord> _abilityRecords = const [];
+  List<DailyTrainingSummary> _trainingHistory = const [];
   DailyTrainingSummary? _dailyTrainingSummary;
 
   @override
@@ -84,6 +91,7 @@ class _MainShellState extends State<MainShell> {
     _loadTrainingContext();
     _loadMistakes();
     _loadLearningAbility();
+    _loadLearningProgress();
   }
 
   Future<void> _loadSavedItems() async {
@@ -136,6 +144,12 @@ class _MainShellState extends State<MainShell> {
     setState(() => _abilityRecords = records);
   }
 
+  Future<void> _loadLearningProgress() async {
+    final history = await _learningProgressStore.load();
+    if (!mounted) return;
+    setState(() => _trainingHistory = history);
+  }
+
   LearningAbilityReport _buildAbilityReport() {
     return LearningAbilityAnalyzer.build(
       tracked: _abilityRecords,
@@ -143,6 +157,39 @@ class _MainShellState extends State<MainShell> {
       weaknesses: _weaknesses,
     );
   }
+  LearningProgressReport _buildProgressReport(
+    LearningAbilityReport abilityReport,
+  ) {
+    final history = [..._trainingHistory];
+    final latest = _dailyTrainingSummary;
+    if (latest != null &&
+        !history.any(
+          (item) =>
+              item.completedAt == latest.completedAt &&
+              item.dateKey == latest.dateKey,
+        )) {
+      history.add(latest);
+    }
+
+    return LearningProgressReport(
+      history: history,
+      abilityReport: abilityReport,
+      activeMistakeCount:
+          _mistakes.where((item) => item.isActive).length,
+    );
+  }
+
+  LearningPathPlan _buildLearningPath(
+    LearningAbilityReport abilityReport,
+    LearningProgressReport progressReport,
+  ) {
+    return LearningPathPlanner.build(
+      abilityReport: abilityReport,
+      progressReport: progressReport,
+      mistakes: _mistakes,
+    );
+  }
+
 
   Future<void> _loadTrainingContext() async {
     final chatState = await _aiChatStore.load();
@@ -229,8 +276,12 @@ class _MainShellState extends State<MainShell> {
     DailyTrainingSummary summary,
   ) async {
     await _dailyTrainingStore.save(summary);
+    final history = await _learningProgressStore.append(summary);
     if (!mounted) return;
-    setState(() => _dailyTrainingSummary = summary);
+    setState(() {
+      _dailyTrainingSummary = summary;
+      _trainingHistory = history;
+    });
   }
 
   Future<void> _startDailyTraining() async {
@@ -364,6 +415,41 @@ class _MainShellState extends State<MainShell> {
     });
   }
 
+  Future<void> _openProgressCenter() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => ProgressCenterScreen(
+          report: progressReport,
+        ),
+      ),
+    );
+  }
+
+  void _handleLearningPathAction(String action) {
+    switch (action) {
+      case 'mistakes':
+        _startMistakeTraining();
+        break;
+      case 'ai':
+        _openPage(2);
+        break;
+      case 'roleplay':
+        _openPage(2);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('已切到 Shili，點上方 🎭 就能選擇情境任務。'),
+          ),
+        );
+        break;
+      case 'daily':
+      default:
+        _startDailyTraining();
+    }
+  }
+
   Future<void> _openBackup() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -442,6 +528,11 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    final learningPath = _buildLearningPath(
+      abilityReport,
+      progressReport,
+    );
     final dailyPlan = _buildDailyTrainingPlan();
     final dailyCompleted =
         _dailyTrainingSummary?.isForDate(DateTime.now()) == true;
@@ -454,6 +545,9 @@ class _MainShellState extends State<MainShell> {
         dailyTrainingEstimatedMinutes: dailyPlan.estimatedMinutes,
         dailyTrainingCompleted: dailyCompleted,
         dailyTrainingFocusLabel: abilityReport.priorityLabel,
+        learningStreak: progressReport.streakAt(DateTime.now()),
+        learningPath: learningPath,
+        onLearningPathAction: _handleLearningPathAction,
         onStartDailyTraining: _startDailyTraining,
         onStartReview: _startReview,
       ),
@@ -482,6 +576,7 @@ class _MainShellState extends State<MainShell> {
         mistakes: _mistakes,
         abilityReport: abilityReport,
         onPracticeMistakes: _startMistakeTraining,
+        onOpenProgress: _openProgressCenter,
         onOpenBackup: _openBackup,
       ),
     ];

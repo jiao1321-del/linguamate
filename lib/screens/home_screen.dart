@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/learning_item.dart';
+import '../models/learning_path.dart';
 import '../widgets/stat_card.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -10,6 +11,9 @@ class HomeScreen extends StatelessWidget {
   final int dailyTrainingEstimatedMinutes;
   final bool dailyTrainingCompleted;
   final String? dailyTrainingFocusLabel;
+  final int learningStreak;
+  final LearningPathPlan learningPath;
+  final ValueChanged<String>? onLearningPathAction;
   final VoidCallback? onStartDailyTraining;
   final VoidCallback onStartReview;
 
@@ -21,6 +25,11 @@ class HomeScreen extends StatelessWidget {
     this.dailyTrainingEstimatedMinutes = 0,
     this.dailyTrainingCompleted = false,
     this.dailyTrainingFocusLabel,
+    this.learningStreak = 0,
+    this.learningPath = const LearningPathPlan(
+      steps: <LearningPathStep>[],
+    ),
+    this.onLearningPathAction,
     this.onStartDailyTraining,
     required this.onStartReview,
   });
@@ -126,6 +135,16 @@ class HomeScreen extends StatelessWidget {
                                   ),
                         ),
                       ),
+                      if (learningStreak > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Text(
+                            '🔥 $learningStreak 天',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
                       if (dailyTrainingCompleted)
                         const Icon(Icons.check_circle_rounded),
                     ],
@@ -168,6 +187,117 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ),
+          if (!learningPath.isEmpty) ...[
+            const SizedBox(height: 18),
+            Card(
+              key: const ValueKey('learning-path-card'),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.route_outlined,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '我的學習路線',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '依你的熟練度、錯題與近期表現自動安排。',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF756B82),
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    for (var index = 0;
+                        index < learningPath.steps.length;
+                        index++) ...[
+                      Container(
+                        key: ValueKey('learning-path-step-$index'),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8F5FC),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CircleAvatar(
+                              radius: 15,
+                              child: Text(
+                                '${index + 1}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    learningPath.steps[index].title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    learningPath.steps[index].reason,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: const Color(0xFF756B82),
+                                        ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextButton.icon(
+                                    key: ValueKey(
+                                      'learning-path-action-$index',
+                                    ),
+                                    onPressed: onLearningPathAction == null
+                                        ? null
+                                        : () => onLearningPathAction!(
+                                              learningPath
+                                                  .steps[index].action,
+                                            ),
+                                    icon: const Icon(
+                                      Icons.arrow_forward_rounded,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      learningPath.steps[index].actionLabel,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (index != learningPath.steps.length - 1)
+                        const SizedBox(height: 8),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           Card(
             child: Padding(

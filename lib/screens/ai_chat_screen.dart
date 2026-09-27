@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../models/ai_chat_state.dart';
 import '../models/ai_coach_reply.dart';
+import '../models/roleplay_mission.dart';
 import '../services/ai_chat_store.dart';
 import '../services/practice_starter_service.dart';
+import '../services/roleplay_mission_service.dart';
+import '../services/speech_coach_service.dart';
 import '../widgets/gilded_card_icon.dart';
 import '../widgets/shili_coach_avatar.dart';
 import '../widgets/shili_coach_header.dart';
@@ -28,6 +31,7 @@ class AiChatScreen extends StatefulWidget {
   final ChatLearningSaver onSaveLearning;
   final ChatWeaknessRecorder? onWeaknessDetected;
   final ValueChanged<AiCoachReply>? onLearningPackUpdated;
+  final SpeechCoachService? speechService;
   final AiChatStore chatStore;
 
   const AiChatScreen({
@@ -36,6 +40,7 @@ class AiChatScreen extends StatefulWidget {
     required this.onSaveLearning,
     this.onWeaknessDetected,
     this.onLearningPackUpdated,
+    this.speechService,
     this.chatStore = const AiChatStore(),
   });
 
@@ -54,11 +59,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  late final SpeechCoachService _speechService;
 
   String _targetLanguage = 'English';
   String _scenario = '自由對話';
+  RoleplayMission? _activeMission;
   bool _isRestoring = true;
   bool _isSending = false;
+  bool _isListening = false;
   int? _savingIndex;
   String? _error;
   late List<AiChatMessage> _entries;
@@ -66,12 +74,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   void initState() {
     super.initState();
+    _speechService = widget.speechService ?? createSpeechCoachService();
     _entries = [_welcomeEntry(_targetLanguage, _scenario)];
     _restoreConversation();
   }
 
   @override
   void dispose() {
+    _speechService.stop();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -170,6 +180,57 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
+  String get _speechLanguageTag => switch (_targetLanguage) {
+        'Tagalog' => 'fil-PH',
+        'Taglish' => 'en-PH',
+        _ => 'en-US',
+      };
+
+  Future<void> _speakText(String text) async {
+    if (!_speechService.canSpeak || text.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('目前這個瀏覽器無法使用語音朗讀。')),
+      );
+      return;
+    }
+
+    await _speechService.speak(
+      text: text,
+      languageTag: _speechLanguageTag,
+    );
+  }
+
+  Future<void> _startVoiceInput() async {
+    if (_isListening || _isSending || _isRestoring) return;
+
+    if (!_speechService.canListen) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('目前瀏覽器不支援語音輸入，仍可使用鍵盤練習。'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isListening = true);
+    try {
+      final transcript = await _speechService.listen(
+        languageTag: _speechLanguageTag,
+      );
+      if (!mounted || transcript == null || transcript.trim().isEmpty) return;
+
+      _controller.value = TextEditingValue(
+        text: transcript.trim(),
+        selection: TextSelection.collapsed(
+          offset: transcript.trim().length,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isListening = false);
+    }
+  }
+
   Future<void> _changeTarget(String language) async {
     if (_isRestoring ||
         _isSending ||
@@ -197,7 +258,104 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     setState(() {
       _scenario = scenario;
+      _activeMission = null;
       _entries = [_welcomeEntry(_targetLanguage, scenario)];
+      _error = null;
+    });
+    _controller.clear();
+    await _persistConversation();
+  }
+
+  int get _missionUserTurns =>
+      _activeMission == null ? 0 : _entries.where((entry) => entry.mine).length;
+
+  AiChatMessage _missionWelcomeEntry(RoleplayMission mission) {
+    return AiChatMessage(
+      mine: false,
+      text:
+          '🎭 任務：${mission.title}\n'
+          '你是：${mission.yourRole}\n'
+          '我是：${mission.shiliRole}\n'
+          '目標：${mission.goal}\n\n'
+          '準備好了就開始，我會留在角色裡陪你完成任務。',
+    );
+  }
+
+  Future<void> _showRoleplayMissions() async {
+    if (_isRestoring || _isSending || _savingIndex != null) return;
+
+    final selected = await showModalBottomSheet<RoleplayMission>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        final maxHeight = MediaQuery.sizeOf(context).height * 0.78;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+              children: [
+                Text(
+                  'AI 情境任務',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                const Text('選一個真實情境，和 Shili 直接進入角色扮演。'),
+                const SizedBox(height: 12),
+                for (final mission in RoleplayMissionService.missions)
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: ListTile(
+                      key: ValueKey('roleplay-${mission.id}'),
+                      leading: const Icon(Icons.theater_comedy_outlined),
+                      title: Text(
+                        mission.title,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        '${mission.yourRole} → ${mission.shiliRole}\n${mission.goal}',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      isThreeLine: true,
+                      trailing: const Icon(Icons.play_arrow_rounded),
+                      onTap: () => Navigator.of(context).pop(mission),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selected == null) return;
+
+    setState(() {
+      _activeMission = selected;
+      _scenario = selected.baseScenario;
+      _entries = [_missionWelcomeEntry(selected)];
+      _error = null;
+    });
+
+    _controller.value = TextEditingValue(
+      text: selected.suggestedOpening,
+      selection: TextSelection.collapsed(
+        offset: selected.suggestedOpening.length,
+      ),
+    );
+    await _persistConversation();
+  }
+
+  Future<void> _exitRoleplayMission() async {
+    if (_activeMission == null) return;
+    setState(() {
+      _activeMission = null;
+      _entries = [_welcomeEntry(_targetLanguage, _scenario)];
       _error = null;
     });
     _controller.clear();
@@ -475,6 +633,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     if (_isRestoring || _isSending || _savingIndex != null) return;
 
     setState(() {
+      _activeMission = null;
       _entries = [_welcomeEntry(_targetLanguage, _scenario)];
       _error = null;
     });
@@ -518,10 +677,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
     unawaited(_persistConversationSafely());
 
     try {
+      final effectiveScenario =
+          _activeMission?.backendScenario ?? _scenario;
       final reply = await widget.onSend(
         message,
         _targetLanguage,
-        _scenario,
+        effectiveScenario,
         history,
       );
       if (!mounted) return;
@@ -633,9 +794,44 @@ class _AiChatScreenState extends State<AiChatScreen> {
             onLanguageSelected: _changeTarget,
             onScenarioSelected: _changeScenario,
             onStarterIdeas: _showStarterIdeas,
+            onRoleplayMissions: _showRoleplayMissions,
+            activeMissionTitle: _activeMission?.title,
             onReviewConversation: _showConversationReview,
             onClearConversation: _clearConversation,
           ),
+          if (_activeMission != null)
+            Container(
+              key: const ValueKey('active-roleplay-mission'),
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+              padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4EEFF),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.flag_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _missionUserTurns >= 4
+                          ? '✅ 任務已完成：${_activeMission!.title} · 可以打開學習包回顧'
+                          : '🎭 ${_activeMission!.title} · ${_activeMission!.goal} · $_missionUserTurns/4 回合',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  IconButton(
+                    key: const ValueKey('exit-roleplay-mission'),
+                    tooltip: '結束任務',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _exitRoleplayMission,
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 4),
           Expanded(
             child: ListView.builder(
@@ -653,6 +849,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   onSave: entry.reply == null
                       ? null
                       : () => _saveLearningEntry(index),
+                  onSpeak: entry.mine
+                      ? null
+                      : () => _speakText(
+                            entry.reply?.reply ?? entry.text,
+                          ),
                 );
               },
             ),
@@ -712,6 +913,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                SizedBox(
+                  width: 46,
+                  height: 50,
+                  child: IconButton(
+                    key: const ValueKey('voice-chat-input'),
+                    tooltip: '語音輸入',
+                    onPressed: _isRestoring || _isSending || _isListening
+                        ? null
+                        : _startVoiceInput,
+                    icon: _isListening
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.mic_none_rounded),
+                  ),
+                ),
+                const SizedBox(width: 4),
                 SizedBox(
                   width: 50,
                   height: 50,
@@ -1030,11 +1250,13 @@ class _ConversationEntry extends StatelessWidget {
   final AiChatMessage entry;
   final bool isSaving;
   final VoidCallback? onSave;
+  final VoidCallback? onSpeak;
 
   const _ConversationEntry({
     required this.entry,
     required this.isSaving,
     required this.onSave,
+    required this.onSpeak,
   });
 
   @override
@@ -1073,15 +1295,30 @@ class _ConversationEntry extends StatelessWidget {
                 Flexible(
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 278),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
                     ),
-                    child: SelectableText(entry.text),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: SelectableText(entry.text)),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          key: ValueKey(
+                            'speak-shili-${entry.text.hashCode}',
+                          ),
+                          tooltip: '聽 Shili 朗讀',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: onSpeak,
+                          icon: const Icon(
+                            Icons.volume_up_outlined,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

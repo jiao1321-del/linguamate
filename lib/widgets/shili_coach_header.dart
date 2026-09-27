@@ -11,6 +11,8 @@ class ShiliCoachHeader extends StatelessWidget {
   final ValueChanged<String> onLanguageSelected;
   final ValueChanged<String> onScenarioSelected;
   final VoidCallback onStarterIdeas;
+  final VoidCallback onRoleplayMissions;
+  final String? activeMissionTitle;
   final VoidCallback onReviewConversation;
   final VoidCallback onClearConversation;
 
@@ -24,6 +26,8 @@ class ShiliCoachHeader extends StatelessWidget {
     required this.onLanguageSelected,
     required this.onScenarioSelected,
     required this.onStarterIdeas,
+    required this.onRoleplayMissions,
+    this.activeMissionTitle,
     required this.onReviewConversation,
     required this.onClearConversation,
   });
@@ -149,6 +153,19 @@ class ShiliCoachHeader extends StatelessWidget {
                 icon: const Icon(Icons.lightbulb_outline_rounded),
               ),
               const SizedBox(width: 2),
+              IconButton(
+                key: const ValueKey('roleplay-missions-button'),
+                tooltip: activeMissionTitle == null
+                    ? '情境任務'
+                    : '任務：$activeMissionTitle',
+                visualDensity: VisualDensity.compact,
+                onPressed: enabled ? onRoleplayMissions : null,
+                icon: Icon(
+                  activeMissionTitle == null
+                      ? Icons.theater_comedy_outlined
+                      : Icons.theater_comedy_rounded,
+                ),
+              ),
               IconButton(
                 key: const ValueKey('conversation-review-button'),
                 tooltip: '單字・文法・回顧',

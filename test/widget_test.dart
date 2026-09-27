@@ -18,12 +18,41 @@ import 'package:linguamate/screens/saved_screen.dart';
 import 'package:linguamate/services/ai_chat_store.dart';
 import 'package:linguamate/services/backup_codec.dart';
 import 'package:linguamate/services/learning_store.dart';
+import 'package:linguamate/services/speech_coach_api.dart';
 import 'package:linguamate/services/weakness_classifier.dart';
 import 'package:linguamate/services/weakness_store.dart';
 import 'package:linguamate/widgets/gilded_card_icon.dart';
 import 'package:linguamate/widgets/shili_coach_avatar.dart';
 import 'package:linguamate/widgets/shili_coach_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class _FakeSpeechCoachService implements SpeechCoachService {
+  final List<String> spoken = <String>[];
+  String? transcript = 'I spoke this sentence.';
+
+  @override
+  bool get canListen => true;
+
+  @override
+  bool get canSpeak => true;
+
+  @override
+  Future<String?> listen({
+    required String languageTag,
+  }) async =>
+      transcript;
+
+  @override
+  Future<void> speak({
+    required String text,
+    required String languageTag,
+  }) async {
+    spoken.add('$languageTag:$text');
+  }
+
+  @override
+  void stop() {}
+}
 
 void main() {
   setUp(() {
@@ -657,6 +686,94 @@ void main() {
       find.text('Got it. What happened on the production line?'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('AI chat supports Shili listening and voice input',
+      (tester) async {
+    final speech = _FakeSpeechCoachService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiChatScreen(
+            speechService: speech,
+            onSend: (_, __, ___, ____) async => const AiCoachReply(
+              reply: 'Nice! Keep going.',
+              correction: '',
+              explanation: '自然回覆。',
+              translation: '很好，繼續。',
+            ),
+            onSaveLearning: (_) async => true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('voice-chat-input')));
+    await tester.pumpAndSettle();
+
+    final input = tester.widget<TextField>(
+      find.byKey(const ValueKey('chat-input')),
+    );
+    expect(input.controller?.text, 'I spoke this sentence.');
+
+    await tester.tap(find.byTooltip('聽 Shili 朗讀').first);
+    await tester.pumpAndSettle();
+    expect(speech.spoken, isNotEmpty);
+    expect(speech.spoken.first, startsWith('en-US:'));
+  });
+
+  testWidgets('AI chat starts a roleplay mission and sends mission context',
+      (tester) async {
+    String? sentScenario;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiChatScreen(
+            onSend: (_, __, scenario, ____) async {
+              sentScenario = scenario;
+              return const AiCoachReply(
+                reply: 'May I see your passport, please?',
+                correction: '',
+                explanation: '自然的機場報到對話。',
+                translation: '可以讓我看一下你的護照嗎？',
+              );
+            },
+            onSaveLearning: (_) async => true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('roleplay-missions-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI 情境任務'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('roleplay-airport-checkin')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('active-roleplay-mission')),
+      findsOneWidget,
+    );
+    final input = tester.widget<TextField>(
+      find.byKey(const ValueKey('chat-input')),
+    );
+    expect(input.controller?.text, 'Hi, I’d like to check in for my flight.');
+
+    await tester.tap(find.byKey(const ValueKey('send-chat-message')));
+    await tester.pumpAndSettle();
+
+    expect(sentScenario, isNotNull);
+    expect(sentScenario, startsWith('任務｜機場報到'));
+    expect(find.text('May I see your passport, please?'), findsOneWidget);
   });
 
   testWidgets('AI chat restores saved conversation and language',
