@@ -4,6 +4,8 @@ import 'dart:async';
 import 'dart:html' as html;
 import 'dart:js' as js;
 
+import 'package:js/js.dart' as js_interop;
+
 import 'speech_coach_api.dart';
 
 SpeechCoachService createSpeechCoachService() =>
@@ -56,7 +58,7 @@ class BrowserSpeechCoachService implements SpeechCoachService {
       if (!completer.isCompleted) completer.complete(value);
     }
 
-    recognition['onresult'] = js.allowInterop((dynamic event) {
+    recognition['onresult'] = js_interop.allowInterop((dynamic event) {
       try {
         final results = event['results'];
         final firstResult = results[0];
@@ -70,8 +72,8 @@ class BrowserSpeechCoachService implements SpeechCoachService {
       }
     });
 
-    recognition['onerror'] = js.allowInterop((dynamic _) => complete(null));
-    recognition['onend'] = js.allowInterop((dynamic _) => complete(null));
+    recognition['onerror'] = js_interop.allowInterop((dynamic _) => complete(null));
+    recognition['onend'] = js_interop.allowInterop((dynamic _) => complete(null));
 
     try {
       recognition.callMethod('start');
