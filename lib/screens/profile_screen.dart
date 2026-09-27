@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/learning_item.dart';
+import '../models/mistake_record.dart';
 import '../models/weakness_record.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -8,6 +9,8 @@ class ProfileScreen extends StatelessWidget {
   final bool isLoading;
   final List<WeaknessRecord> weaknesses;
   final bool isLoadingWeaknesses;
+  final List<MistakeRecord> mistakes;
+  final VoidCallback? onPracticeMistakes;
   final VoidCallback onOpenBackup;
 
   const ProfileScreen({
@@ -16,6 +19,8 @@ class ProfileScreen extends StatelessWidget {
     required this.isLoading,
     this.weaknesses = const <WeaknessRecord>[],
     this.isLoadingWeaknesses = false,
+    this.mistakes = const <MistakeRecord>[],
+    this.onPracticeMistakes,
     required this.onOpenBackup,
   });
 
@@ -130,6 +135,82 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            key: const ValueKey('mistake-book-card'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.auto_stories_outlined,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '錯題本',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                        ),
+                      ),
+                      Text(
+                        '${mistakes.where((item) => item.isActive).length} 待加強',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (mistakes.where((item) => item.isActive).isEmpty)
+                    const Text('目前沒有待加強內容，答錯的題目會自動收進這裡。')
+                  else ...[
+                    for (final mistake
+                        in mistakes.where((item) => item.isActive).take(3))
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: CircleAvatar(
+                          child: Text(
+                            mistake.wrongCount.toString(),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        title: Text(
+                          mistake.prompt,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: Text(
+                          '${mistake.title} · 錯 ${mistake.wrongCount} 次',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    FilledButton.tonalIcon(
+                      key: const ValueKey('practice-mistakes-button'),
+                      onPressed: onPracticeMistakes,
+                      icon: const Icon(Icons.replay_rounded),
+                      label: const Text('只練錯題'),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '連續答對 3 次後會自動降低優先級。',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF756B82),
+                          ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 18),
