@@ -777,6 +777,13 @@ void main() {
       ),
     );
 
+    await tester.scrollUntilVisible(
+      find.text('常見弱點'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('常見弱點'), findsOneWidget);
     expect(find.text('時態'), findsOneWidget);
     expect(find.text('3 次'), findsOneWidget);
