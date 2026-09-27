@@ -241,6 +241,10 @@ void main() {
     expect(find.text('AI 對話教練'), findsNothing);
     expect(find.text('汐璃 Shili'), findsOneWidget);
     expect(find.byType(ShiliCoachAvatar), findsAtLeastNWidgets(1));
+    expect(
+      find.byKey(const ValueKey('shili-avatar-v14')),
+      findsAtLeastNWidgets(1),
+    );
     final coachPanel = find.byType(ShiliCoachHeader);
     expect(coachPanel, findsOneWidget);
     expect(
@@ -1085,6 +1089,10 @@ void main() {
     );
 
     expect(find.byType(GildedCardIcon), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('shili-coach-card-v14')),
+      findsOneWidget,
+    );
     expect(find.text('完整學習卡'), findsNothing);
   });
 
