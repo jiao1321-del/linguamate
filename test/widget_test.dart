@@ -479,6 +479,19 @@ void main() {
     expect(find.text('during inspection'), findsOneWidget);
     expect(find.text('在檢驗期間'), findsOneWidget);
 
+    await tester.tap(
+      find.byKey(const ValueKey('save-vocabulary-during inspection')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(savedText, 'during inspection');
+    expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('conversation-review-button')),
+    );
+    await tester.pumpAndSettle();
+
     final sheetScrollable = find.byType(Scrollable).last;
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('grammar-practice-card')),
@@ -506,26 +519,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('✅ 答對了'), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('save-vocabulary-during inspection')),
-    );
-    await tester.tap(
-      find.byKey(const ValueKey('save-vocabulary-during inspection')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(savedText, 'during inspection');
-    expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
-
-    await tester.tap(
-      find.byKey(const ValueKey('conversation-review-button')),
-    );
-    await tester.pumpAndSettle();
-
     final reviewCard = find.byKey(
       const ValueKey('conversation-review-card-2'),
     );
-    await tester.ensureVisible(reviewCard);
+    await tester.scrollUntilVisible(
+      reviewCard,
+      260,
+      scrollable: sheetScrollable,
+    );
+    await tester.pumpAndSettle();
+
     expect(reviewCard, findsOneWidget);
     expect(
       find.descendant(
@@ -542,7 +545,11 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.ensureVisible(find.byKey(const ValueKey('review-save-2')));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('review-save-2')),
+      160,
+      scrollable: sheetScrollable,
+    );
     await tester.tap(find.byKey(const ValueKey('review-save-2')));
     await tester.pumpAndSettle();
 
