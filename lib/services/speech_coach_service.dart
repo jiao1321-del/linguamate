@@ -57,9 +57,11 @@ class PluginSpeechCoachService implements SpeechCoachService {
     if (!available) return null;
 
     await _speech.listen(
-      localeId: languageTag,
-      listenFor: const Duration(seconds: 12),
-      pauseFor: const Duration(seconds: 3),
+      listenOptions: stt.SpeechListenOptions(
+        localeId: languageTag,
+        listenFor: const Duration(seconds: 12),
+        pauseFor: const Duration(seconds: 3),
+      ),
       onResult: (result) {
         final value = result.recognizedWords.trim();
         if (value.isNotEmpty) latest = value;
