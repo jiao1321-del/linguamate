@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'models/ai_coach_reply.dart';
 import 'models/language_analysis.dart';
 import 'models/learning_item.dart';
+import 'models/weakness_record.dart';
 import 'screens/ai_chat_screen.dart';
 import 'screens/backup_screen.dart';
 import 'screens/home_screen.dart';
@@ -12,6 +14,8 @@ import 'screens/saved_screen.dart';
 import 'services/ai_chat_service.dart';
 import 'services/language_analysis_service.dart';
 import 'services/learning_store.dart';
+import 'services/weakness_classifier.dart';
+import 'services/weakness_store.dart';
 
 void main() {
   runApp(const LinguaMateApp());
@@ -46,15 +50,19 @@ class _MainShellState extends State<MainShell> {
   final _learningStore = LearningStore();
   final _analysisService = LanguageAnalysisService();
   final _aiChatService = AiChatService();
+  final _weaknessStore = const WeaknessStore();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
+  bool _isLoadingWeaknesses = true;
   List<LearningItem> _savedItems = const [];
+  List<WeaknessRecord> _weaknesses = const [];
 
   @override
   void initState() {
     super.initState();
     _loadSavedItems();
+    _loadWeaknesses();
   }
 
   Future<void> _loadSavedItems() async {
@@ -72,6 +80,25 @@ class _MainShellState extends State<MainShell> {
       setState(() {
         _savedItems = const [];
         _isLoadingSavedItems = false;
+      });
+    }
+  }
+
+  Future<void> _loadWeaknesses() async {
+    try {
+      final records = await _weaknessStore.load();
+      if (!mounted) return;
+
+      setState(() {
+        _weaknesses = records;
+        _isLoadingWeaknesses = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _weaknesses = const [];
+        _isLoadingWeaknesses = false;
       });
     }
   }
@@ -118,6 +145,27 @@ class _MainShellState extends State<MainShell> {
 
     final analysis = await _analysisService.analyze(normalizedText);
     return _saveLearningItem(normalizedText, analysis);
+  }
+
+  Future<void> _recordChatWeakness(
+    String userText,
+    AiCoachReply reply,
+  ) async {
+    final category = WeaknessClassifier.classify(reply);
+    if (category == null) return;
+
+    final records = await _weaknessStore.record(
+      category: category,
+      example: userText,
+      correction: reply.correction,
+      explanation: reply.explanation,
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _weaknesses = records;
+      _isLoadingWeaknesses = false;
+    });
   }
 
   Future<void> _deleteLearningItem(String id) async {
@@ -252,6 +300,7 @@ class _MainShellState extends State<MainShell> {
       AiChatScreen(
         onSend: _aiChatService.send,
         onSaveLearning: _saveChatLearningItem,
+        onWeaknessDetected: _recordChatWeakness,
       ),
       SavedScreen(
         items: _savedItems,
@@ -262,6 +311,8 @@ class _MainShellState extends State<MainShell> {
       ProfileScreen(
         items: _savedItems,
         isLoading: _isLoadingSavedItems,
+        weaknesses: _weaknesses,
+        isLoadingWeaknesses: _isLoadingWeaknesses,
         onOpenBackup: _openBackup,
       ),
     ];
