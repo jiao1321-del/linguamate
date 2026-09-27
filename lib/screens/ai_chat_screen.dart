@@ -321,75 +321,152 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return items.sublist(items.length - 8);
   }
 
+  List<AiCoachVocabulary> _conversationVocabulary() {
+    final seen = <String>{};
+    final items = <AiCoachVocabulary>[];
+
+    for (final entry in _entries.reversed) {
+      final vocabulary = entry.reply?.vocabulary ?? const <AiCoachVocabulary>[];
+      for (final item in vocabulary) {
+        final key = item.term.trim().toLowerCase();
+        if (key.isEmpty || !seen.add(key)) continue;
+        items.add(item);
+        if (items.length >= 9) return items;
+      }
+    }
+
+    return items;
+  }
+
+  AiCoachGrammar? _latestGrammar() {
+    for (final entry in _entries.reversed) {
+      final grammar = entry.reply?.grammar;
+      if (grammar != null && grammar.isValid) return grammar;
+    }
+    return null;
+  }
+
   Future<void> _showConversationReview() async {
     if (_isRestoring || _isSending || _savingIndex != null) return;
 
     final items = _conversationReviewItems();
+    final vocabulary = _conversationVocabulary();
+    final grammar = _latestGrammar();
     final userTurns = _entries.where((entry) => entry.mine).length;
     final correctionCount =
         items.where((item) => item.reply.hasCorrection).length;
+    int? selectedChoice;
 
-    final selectedIndex = await showModalBottomSheet<int>(
+    final selectedText = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) {
-        final maxHeight = MediaQuery.sizeOf(context).height * 0.82;
+        final maxHeight = MediaQuery.sizeOf(context).height * 0.86;
 
-        return SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxHeight),
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-              children: [
-                Text(
-                  '本次對話回顧',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$userTurns 個對話回合 · $correctionCount 個修正重點',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF756B82),
-                      ),
-                ),
-                const SizedBox(height: 14),
-                if (items.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8F5FC),
-                      borderRadius: BorderRadius.circular(16),
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxHeight),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                  children: [
+                    Text(
+                      '本次學習包',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
                     ),
-                    child: const Text(
-                      '目前還沒有需要整理的學習重點。再和 Shili 多聊幾句後回來看看 ✨',
+                    const SizedBox(height: 4),
+                    Text(
+                      '$userTurns 個對話回合 · ${vocabulary.length} 個單字/片語 · $correctionCount 個修正重點',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF756B82),
+                          ),
                     ),
-                  )
-                else
-                  for (var position = 0;
-                      position < items.length;
-                      position++) ...[
-                    _ConversationReviewCard(
-                      item: items[position],
-                      onSave: () => Navigator.of(context).pop(
-                        items[position].entryIndex,
+                    const SizedBox(height: 16),
+                    Text(
+                      '📚 單字量擴充',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (vocabulary.isEmpty)
+                      const _LearningPackEmpty(
+                        text: '再和 Shili 聊一句，就會依對話自動整理 3 個實用單字或片語。',
+                      )
+                    else
+                      for (final item in vocabulary) ...[
+                        _VocabularyCard(
+                          item: item,
+                          onSave: () => Navigator.of(context).pop(item.term),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      '🧩 文法加強',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (grammar == null)
+                      const _LearningPackEmpty(
+                        text: '下一輪對話後，Shili 會依你的句子準備一個文法重點和小練習。',
+                      )
+                    else
+                      _GrammarPracticeCard(
+                        grammar: grammar,
+                        selectedChoice: selectedChoice,
+                        onSelect: (index) {
+                          setSheetState(() => selectedChoice = index);
+                        },
                       ),
+                    const SizedBox(height: 18),
+                    Text(
+                      '📝 對話修正',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
                     ),
-                    if (position != items.length - 1)
-                      const SizedBox(height: 10),
+                    const SizedBox(height: 8),
+                    if (items.isEmpty)
+                      const _LearningPackEmpty(
+                        text: '目前沒有需要整理的修正，繼續自然聊天就好 ✨',
+                      )
+                    else
+                      for (var position = 0;
+                          position < items.length;
+                          position++) ...[
+                        _ConversationReviewCard(
+                          item: items[position],
+                          onSave: () {
+                            final reply = items[position].reply;
+                            Navigator.of(context).pop(
+                              reply.hasCorrection
+                                  ? reply.correction
+                                  : reply.reply,
+                            );
+                          },
+                        ),
+                        if (position != items.length - 1)
+                          const SizedBox(height: 10),
+                      ],
                   ],
-              ],
-            ),
-          ),
+                ),
+              ),
+            );
+          },
         );
       },
     );
 
-    if (!mounted || selectedIndex == null) return;
-    await _saveLearningEntry(selectedIndex);
+    if (!mounted || selectedText == null) return;
+    await _saveLearningText(selectedText);
   }
 
   Future<void> _clearConversation() async {
