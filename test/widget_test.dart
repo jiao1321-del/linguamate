@@ -478,10 +478,23 @@ void main() {
     expect(find.text('📚 單字量擴充'), findsOneWidget);
     expect(find.text('during inspection'), findsOneWidget);
     expect(find.text('在檢驗期間'), findsOneWidget);
+
+    final sheetScrollable = find.byType(Scrollable).last;
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('grammar-practice-card')),
+      260,
+      scrollable: sheetScrollable,
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('🧩 文法加強'), findsOneWidget);
     expect(find.text('特定流程前的 the'), findsOneWidget);
 
-    await tester.ensureVisible(find.byKey(const ValueKey('grammar-choice-1')));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('grammar-choice-1')),
+      180,
+      scrollable: sheetScrollable,
+    );
     await tester.tap(find.byKey(const ValueKey('grammar-choice-1')));
     await tester.pumpAndSettle();
     expect(find.textContaining('✅ 答對了'), findsOneWidget);
