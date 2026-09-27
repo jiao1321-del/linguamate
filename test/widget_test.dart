@@ -404,7 +404,7 @@ void main() {
     );
   });
 
-  testWidgets('conversation review collects correction and can save it',
+  testWidgets('learning pack shows vocabulary grammar and correction',
       (tester) async {
     String? savedText;
 
@@ -418,6 +418,34 @@ void main() {
                 correction: 'The machine stopped during the inspection.',
                 explanation: '特定的檢驗流程前面加 the 會更自然。',
                 translation: '機台在檢驗過程中停止了。',
+                vocabulary: [
+                  AiCoachVocabulary(
+                    term: 'during inspection',
+                    chinese: '在檢驗期間',
+                    example: 'The alarm went off during inspection.',
+                    exampleChinese: '警報在檢驗期間響了。',
+                  ),
+                  AiCoachVocabulary(
+                    term: 'unexpectedly',
+                    chinese: '意外地、突然地',
+                    example: 'The machine stopped unexpectedly.',
+                    exampleChinese: '機台突然停止了。',
+                  ),
+                  AiCoachVocabulary(
+                    term: 'restart',
+                    chinese: '重新啟動',
+                    example: 'We need to restart the machine.',
+                    exampleChinese: '我們需要重新啟動機台。',
+                  ),
+                ],
+                grammar: AiCoachGrammar(
+                  title: '特定流程前的 the',
+                  explanation: '談到雙方都知道的特定檢驗流程時，可以使用 the。',
+                  question: 'The machine stopped during ___ inspection.',
+                  choices: ['a', 'the', 'an'],
+                  answerIndex: 1,
+                  answerExplanation: '這裡指的是特定的檢驗流程，所以用 the。',
+                ),
               );
             },
             onSaveLearning: (text) async {
@@ -442,11 +470,42 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('本次對話回顧'), findsOneWidget);
-    expect(find.text('1 個對話回合 · 1 個修正重點'), findsOneWidget);
+    expect(find.text('本次學習包'), findsOneWidget);
+    expect(
+      find.text('1 個對話回合 · 3 個單字/片語 · 1 個修正重點'),
+      findsOneWidget,
+    );
+    expect(find.text('📚 單字量擴充'), findsOneWidget);
+    expect(find.text('during inspection'), findsOneWidget);
+    expect(find.text('在檢驗期間'), findsOneWidget);
+    expect(find.text('🧩 文法加強'), findsOneWidget);
+    expect(find.text('特定流程前的 the'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('grammar-choice-1')));
+    await tester.tap(find.byKey(const ValueKey('grammar-choice-1')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('✅ 答對了'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('save-vocabulary-during inspection')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('save-vocabulary-during inspection')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(savedText, 'during inspection');
+    expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('conversation-review-button')),
+    );
+    await tester.pumpAndSettle();
+
     final reviewCard = find.byKey(
       const ValueKey('conversation-review-card-2'),
     );
+    await tester.ensureVisible(reviewCard);
     expect(reviewCard, findsOneWidget);
     expect(
       find.descendant(
@@ -462,26 +521,12 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(
-      find.descendant(
-        of: reviewCard,
-        matching: find.text('特定的檢驗流程前面加 the 會更自然。'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: reviewCard,
-        matching: find.text('機台在檢驗過程中停止了。'),
-      ),
-      findsOneWidget,
-    );
 
+    await tester.ensureVisible(find.byKey(const ValueKey('review-save-2')));
     await tester.tap(find.byKey(const ValueKey('review-save-2')));
     await tester.pumpAndSettle();
 
     expect(savedText, 'The machine stopped during the inspection.');
-    expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
   });
 
   testWidgets('AI chat can send from the keyboard send action',
@@ -674,6 +719,22 @@ void main() {
                 chinese: '我晚點還有工作。',
               ),
             ],
+            vocabulary: [
+              AiCoachVocabulary(
+                term: 'take a break',
+                chinese: '休息一下',
+                example: 'Take a short break muna.',
+                exampleChinese: '先休息一下。',
+              ),
+            ],
+            grammar: AiCoachGrammar(
+              title: 'muna 的位置',
+              explanation: 'muna 常放在動作後，表示「先…一下」。',
+              question: 'Take a short break ___.',
+              choices: ['muna', 'kahapon', 'bukas'],
+              answerIndex: 0,
+              answerExplanation: 'muna 表示先做某件事。',
+            ),
           ),
         ),
       ],
@@ -694,6 +755,12 @@ void main() {
       loaded?.messages.last.reply?.suggestions.first.chinese,
       '我今天只是有點累。',
     );
+    expect(
+      loaded?.messages.last.reply?.vocabulary.first.term,
+      'take a break',
+    );
+    expect(loaded?.messages.last.reply?.grammar?.title, 'muna 的位置');
+    expect(loaded?.messages.last.reply?.grammar?.answerIndex, 0);
 
     await store.clear();
     expect(await store.load(), isNull);
