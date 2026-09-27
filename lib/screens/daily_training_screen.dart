@@ -102,6 +102,24 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
       totalTasks: widget.plan.totalTasks,
       correctTasks: _correct,
       completedAt: DateTime.now(),
+      typeTotals: {
+        for (final type in const [
+          'vocabulary',
+          'grammar',
+          'weakness',
+          'review',
+        ])
+          if (_totalFor(type) > 0) type: _totalFor(type),
+      },
+      typeCorrect: {
+        for (final type in const [
+          'vocabulary',
+          'grammar',
+          'weakness',
+          'review',
+        ])
+          if (_correctFor(type) > 0) type: _correctFor(type),
+      },
     );
 
     await widget.onCompleted(summary);
