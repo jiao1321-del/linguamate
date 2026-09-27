@@ -151,10 +151,10 @@ class ShiliCoachHeader extends StatelessWidget {
               const SizedBox(width: 2),
               IconButton(
                 key: const ValueKey('conversation-review-button'),
-                tooltip: '本次回顧',
+                tooltip: '單字・文法・回顧',
                 visualDensity: VisualDensity.compact,
                 onPressed: enabled ? onReviewConversation : null,
-                icon: const Icon(Icons.fact_check_outlined),
+                icon: const Icon(Icons.school_outlined),
               ),
               IconButton(
                 key: const ValueKey('clear-chat-button'),
