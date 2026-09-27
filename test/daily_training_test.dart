@@ -174,6 +174,7 @@ void main() {
             dailyTrainingTaskCount: 6,
             dailyTrainingEstimatedMinutes: 5,
             dailyTrainingCompleted: false,
+            dailyTrainingFocusLabel: '過去式',
             onStartDailyTraining: () {},
             onStartReview: () {},
           ),
@@ -185,6 +186,10 @@ void main() {
     expect(find.text('今日訓練'), findsOneWidget);
     expect(find.text('6 題 · 約 5 分鐘'), findsOneWidget);
     expect(find.text('開始今日訓練'), findsOneWidget);
+    expect(
+      find.text('今日優先：過去式 · 依熟練度自動調整題目順序。'),
+      findsOneWidget,
+    );
   });
 
   test('MistakeStore records errors and fades after three correct answers',
