@@ -42,6 +42,8 @@ class AiChatScreen extends StatefulWidget {
   final String learnerMemory;
   final SpeakingResultRecorder? onSpeakingResult;
   final VoidCallback? onStartRecommendedTraining;
+  final String? initialMissionId;
+  final ValueChanged<String>? onMissionCompleted;
 
   const AiChatScreen({
     super.key,
@@ -55,6 +57,8 @@ class AiChatScreen extends StatefulWidget {
     this.learnerMemory = '',
     this.onSpeakingResult,
     this.onStartRecommendedTraining,
+    this.initialMissionId,
+    this.onMissionCompleted,
   });
 
   @override
@@ -84,6 +88,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   int? _savingIndex;
   String? _error;
   String? _failedDraft;
+  bool _missionCompletionReported = false;
   late List<AiChatMessage> _entries;
 
   @override
@@ -135,6 +140,27 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Future<void> _restoreConversation() async {
     final saved = await widget.chatStore.load();
     if (!mounted) return;
+
+    final requestedMission =
+        RoleplayMissionService.byId(widget.initialMissionId);
+    if (requestedMission != null) {
+      setState(() {
+        _activeMission = requestedMission;
+        _targetLanguage = 'English';
+        _scenario = requestedMission.baseScenario;
+        _entries = [_missionWelcomeEntry(requestedMission)];
+        _missionCompletionReported = false;
+        _isRestoring = false;
+      });
+      _controller.value = TextEditingValue(
+        text: requestedMission.suggestedOpening,
+        selection: TextSelection.collapsed(
+          offset: requestedMission.suggestedOpening.length,
+        ),
+      );
+      unawaited(_persistConversationSafely());
+      return;
+    }
 
     final language = saved != null && _targets.contains(saved.targetLanguage)
         ? saved.targetLanguage
@@ -335,6 +361,30 @@ class _AiChatScreenState extends State<AiChatScreen> {
             Text('流暢度估計：${assessment.fluency}%'),
             const SizedBox(height: 10),
             Text(assessment.missingWordsLabel),
+            if (assessment.wordFeedback.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 5,
+                runSpacing: 5,
+                children: [
+                  for (final token in assessment.wordFeedback)
+                    Chip(
+                      avatar: Icon(
+                        switch (token.status) {
+                          SpeakingTokenStatus.correct =>
+                            Icons.check_rounded,
+                          SpeakingTokenStatus.missing =>
+                            Icons.remove_circle_outline_rounded,
+                          SpeakingTokenStatus.extra =>
+                            Icons.add_circle_outline_rounded,
+                        },
+                        size: 16,
+                      ),
+                      label: Text(token.word),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 10),
             Text(
               '此分數依語音辨識文字比對估算，不是音素級發音診斷。',
@@ -392,6 +442,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     setState(() {
       _scenario = scenario;
       _activeMission = null;
+      _missionCompletionReported = false;
       _entries = [_welcomeEntry(_targetLanguage, scenario)];
       _error = null;
     });
@@ -424,6 +475,23 @@ class _AiChatScreenState extends State<AiChatScreen> {
           '目標：${mission.goal}\n\n'
           '準備好了就開始，我會留在角色裡陪你完成任務。',
     );
+  }
+
+  Future<void> _activateMission(RoleplayMission mission) async {
+    setState(() {
+      _activeMission = mission;
+      _scenario = mission.baseScenario;
+      _entries = [_missionWelcomeEntry(mission)];
+      _missionCompletionReported = false;
+      _error = null;
+    });
+    _controller.value = TextEditingValue(
+      text: mission.suggestedOpening,
+      selection: TextSelection.collapsed(
+        offset: mission.suggestedOpening.length,
+      ),
+    );
+    await _persistConversation();
   }
 
   Future<void> _showRoleplayMissions() async {
@@ -480,26 +548,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     if (!mounted || selected == null) return;
 
-    setState(() {
-      _activeMission = selected;
-      _scenario = selected.baseScenario;
-      _entries = [_missionWelcomeEntry(selected)];
-      _error = null;
-    });
-
-    _controller.value = TextEditingValue(
-      text: selected.suggestedOpening,
-      selection: TextSelection.collapsed(
-        offset: selected.suggestedOpening.length,
-      ),
-    );
-    await _persistConversation();
+    await _activateMission(selected);
   }
 
   Future<void> _exitRoleplayMission() async {
     if (_activeMission == null) return;
     setState(() {
       _activeMission = null;
+      _missionCompletionReported = false;
       _entries = [_welcomeEntry(_targetLanguage, _scenario)];
       _error = null;
     });
@@ -861,6 +917,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
         _failedDraft = null;
         _error = null;
       });
+
+      final activeMission = _activeMission;
+      if (activeMission != null &&
+          !_missionCompletionReported &&
+          _missionUserTurns >= activeMission.completionTurns) {
+        _missionCompletionReported = true;
+        widget.onMissionCompleted?.call(activeMission.id);
+      }
 
       final weaknessRecorder = widget.onWeaknessDetected;
       if (weaknessRecorder != null) {
