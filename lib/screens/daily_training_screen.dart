@@ -363,12 +363,25 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
                       children: [
                         Icon(_typeIcon(task.type), size: 20),
                         const SizedBox(width: 8),
-                        Text(
-                          task.title,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                  ),
+                        Expanded(
+                          child: Text(
+                            task.title,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        ),
+                        IconButton(
+                          key: const ValueKey('daily-hint-button'),
+                          tooltip: '給我提示',
+                          onPressed: _usedHint || answered ? null : _showHint,
+                          icon: const Icon(
+                            Icons.lightbulb_outline_rounded,
+                            size: 20,
+                          ),
                         ),
                       ],
                     ),
@@ -402,20 +415,6 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
                                   Theme.of(context).textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.w900,
                                       ),
-                            ),
-                            const SizedBox(height: 10),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                key: const ValueKey('daily-hint-button'),
-                                onPressed:
-                                    _usedHint || answered ? null : _showHint,
-                                icon: const Icon(
-                                  Icons.lightbulb_outline_rounded,
-                                  size: 18,
-                                ),
-                                label: const Text('給我提示'),
-                              ),
                             ),
                             if (_hintText != null)
                               Container(
