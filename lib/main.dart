@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'models/adaptive_learning.dart';
 import 'models/ai_coach_reply.dart';
 import 'models/daily_training.dart';
 import 'models/language_analysis.dart';
@@ -9,6 +10,7 @@ import 'models/learning_path.dart';
 import 'models/learning_progress.dart';
 import 'models/mistake_record.dart';
 import 'models/weakness_record.dart';
+import 'screens/adaptive_learning_screen.dart';
 import 'screens/ai_chat_screen.dart';
 import 'screens/backup_screen.dart';
 import 'screens/daily_training_screen.dart';
@@ -19,6 +21,7 @@ import 'screens/profile_screen.dart';
 import 'screens/progress_center_screen.dart';
 import 'screens/review_screen.dart';
 import 'screens/saved_screen.dart';
+import 'services/adaptive_learning_engine.dart';
 import 'services/ai_chat_service.dart';
 import 'services/ai_chat_store.dart';
 import 'services/daily_training_plan_builder.dart';
@@ -238,12 +241,12 @@ class _MainShellState extends State<MainShell> {
 
   DailyTrainingPlan _buildDailyTrainingPlan() {
     final abilityReport = _buildAbilityReport();
-    return DailyTrainingPlanBuilder.build(
+    return AdaptiveLearningEngine.buildDailyPlan(
       learningItems: _savedItems,
       weaknesses: _weaknesses,
       coachReplies: _coachReplies,
       mistakes: _mistakes,
-      priorityType: abilityReport.priorityType,
+      abilityReport: abilityReport,
     );
   }
 
@@ -265,6 +268,26 @@ class _MainShellState extends State<MainShell> {
       _mistakes = mistakes;
       _abilityRecords = abilities;
     });
+  }
+
+  Future<void> _recordSpeakingResult(
+    PronunciationAssessment assessment,
+  ) async {
+    final task = DailyTrainingTask(
+      id: 'speaking-${DateTime.now().millisecondsSinceEpoch}',
+      type: 'speaking',
+      title: '口說練習',
+      prompt: assessment.target,
+      answer: assessment.naturalSuggestion,
+      explanation:
+          '辨識：${assessment.transcript} · 完整度 ${assessment.completeness}% · 流暢度 ${assessment.fluency}%',
+    );
+    final abilities = await _learningAbilityStore.recordResult(
+      task: task,
+      correct: assessment.passed,
+    );
+    if (!mounted) return;
+    setState(() => _abilityRecords = abilities);
   }
 
   Future<void> _startMistakeTraining() async {
@@ -460,6 +483,63 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
+  Future<void> _openAdaptiveLearning() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    final snapshot = AdaptiveLearningEngine.buildSnapshot(
+      learningItems: _savedItems,
+      abilityReport: abilityReport,
+      progressReport: progressReport,
+      mistakes: _mistakes,
+      weaknesses: _weaknesses,
+      dailyGoal: _dailyGoal,
+    );
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => AdaptiveLearningScreen(
+          snapshot: snapshot,
+          onAction: _handleAdaptiveAction,
+        ),
+      ),
+    );
+  }
+
+  void _handleAdaptiveAction(String action) {
+    switch (action) {
+      case 'mistakes':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _startMistakeTraining();
+        break;
+      case 'speaking':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openPage(2);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('已切到 Shili，點「口說評分」就能開始。'),
+          ),
+        );
+        break;
+      case 'roleplay':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openPage(2);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('已切到 Shili，點上方 🎭 選擇情境任務。'),
+          ),
+        );
+        break;
+      case 'ai':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openPage(2);
+        break;
+      case 'daily':
+      default:
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _startDailyTraining();
+    }
+  }
+
   void _handleLearningPathAction(String action) {
     switch (action) {
       case 'mistakes':
@@ -498,16 +578,17 @@ class _MainShellState extends State<MainShell> {
     bool remembered,
   ) async {
     final now = DateTime.now();
-    final updatedItems = _savedItems
-        .map(
-          (item) => item.id == id
-              ? item.reviewed(
-                  remembered: remembered,
-                  now: now,
-                )
-              : item,
-        )
-        .toList(growable: false);
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    final updatedItems = _savedItems.map((item) {
+      if (item.id != id) return item;
+      return AdaptiveLearningEngine.reviewItem(
+        item: item,
+        remembered: remembered,
+        progressReport: progressReport,
+        now: now,
+      ).item;
+    }).toList(growable: false);
 
     await _learningStore.saveItems(updatedItems);
     if (!mounted) return;
@@ -565,6 +646,14 @@ class _MainShellState extends State<MainShell> {
       abilityReport,
       progressReport,
     );
+    final adaptiveSnapshot = AdaptiveLearningEngine.buildSnapshot(
+      learningItems: _savedItems,
+      abilityReport: abilityReport,
+      progressReport: progressReport,
+      mistakes: _mistakes,
+      weaknesses: _weaknesses,
+      dailyGoal: _dailyGoal,
+    );
     final dailyPlan = _buildDailyTrainingPlan();
     final dailyCompleted =
         _dailyTrainingSummary?.isForDate(DateTime.now()) == true;
@@ -593,6 +682,10 @@ class _MainShellState extends State<MainShell> {
         onSaveLearning: _saveChatLearningItem,
         onWeaknessDetected: _recordChatWeakness,
         onLearningPackUpdated: _captureLearningPack,
+        proactiveCoachMessage: adaptiveSnapshot.coachMessage,
+        learnerMemory: adaptiveSnapshot.memory.summary,
+        onSpeakingResult: _recordSpeakingResult,
+        onStartRecommendedTraining: _startDailyTraining,
       ),
       SavedScreen(
         items: _savedItems,
@@ -610,6 +703,7 @@ class _MainShellState extends State<MainShell> {
         onPracticeMistakes: _startMistakeTraining,
         onOpenProgress: _openProgressCenter,
         onOpenGrowth: _openGrowthCenter,
+        onOpenAdaptive: _openAdaptiveLearning,
         onOpenBackup: _openBackup,
       ),
     ];
