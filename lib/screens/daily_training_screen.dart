@@ -74,10 +74,11 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
       taskId: task.id,
       type: task.type,
       correct: correct,
-      responseMs: now.difference(_taskStartedAt).inMilliseconds.clamp(
-            0,
-            120000,
-          ),
+      responseMs: now
+          .difference(_taskStartedAt)
+          .inMilliseconds
+          .clamp(0, 120000)
+          .toInt(),
       usedHint: _usedHint,
       recordedAt: now,
     );
