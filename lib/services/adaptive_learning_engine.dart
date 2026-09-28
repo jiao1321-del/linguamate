@@ -197,7 +197,7 @@ class AdaptiveLearningEngine {
     if (progressReport.totalTasks >= 10 && accuracy >= 85) {
       interval = (interval * 1.4).round();
     } else if (progressReport.totalTasks >= 10 && accuracy < 60) {
-      interval = (interval * 0.65).round().clamp(1, 60);
+      interval = (interval * 0.65).round().clamp(1, 60).toInt();
     }
 
     if (item.reviewCount >= 4 && nextLevel >= 3) {
@@ -258,7 +258,7 @@ class AdaptiveLearningEngine {
       }
     }
     final completeness =
-        ((matched / targetTokens.length) * 100).round().clamp(0, 100);
+        ((matched / targetTokens.length) * 100).round().clamp(0, 100).toInt();
 
     var sequenceMatches = 0;
     var cursor = 0;
@@ -275,10 +275,11 @@ class AdaptiveLearningEngine {
         ? targetTokens.length
         : spokenTokens.length;
     final fluency =
-        ((sequenceMatches / maxLength) * 100).round().clamp(0, 100);
+        ((sequenceMatches / maxLength) * 100).round().clamp(0, 100).toInt();
     final score = ((completeness * 0.65) + (fluency * 0.35))
         .round()
-        .clamp(0, 100);
+        .clamp(0, 100)
+        .toInt();
 
     return PronunciationAssessment(
       target: target,
@@ -320,7 +321,7 @@ class AdaptiveLearningEngine {
     if (tasks >= 80 && accuracy >= 65) value++;
     if (tasks >= 160 && accuracy >= 75) value++;
     if (mastered >= 4 && accuracy >= 82) value++;
-    return value.clamp(1, 5);
+    return value.clamp(1, 5).toInt();
   }
 
   static String _coachMessage({
