@@ -89,7 +89,7 @@ class _Roadmap30ScreenState extends State<Roadmap30Screen> {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
-                    value: _goal,
+                    initialValue: _goal,
                     decoration: const InputDecoration(labelText: '學習目標'),
                     items: [
                       for (final goal in Roadmap30Generator.goals)
