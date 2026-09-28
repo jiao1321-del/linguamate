@@ -146,18 +146,30 @@ void main() {
     );
 
     expect(find.text('1 / 2'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('daily-choice-1')),
+    );
     await tester.tap(find.byKey(const ValueKey('daily-choice-1')));
     await tester.pumpAndSettle();
     expect(find.text('✅ 答對了'), findsOneWidget);
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('daily-next-task')),
+    );
     await tester.tap(find.byKey(const ValueKey('daily-next-task')));
     await tester.pumpAndSettle();
     expect(find.text('2 / 2'), findsOneWidget);
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('reveal-daily-answer')),
+    );
     await tester.tap(find.byKey(const ValueKey('reveal-daily-answer')));
     await tester.pumpAndSettle();
     expect(find.text('我需要幫忙。'), findsOneWidget);
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('daily-remembered')),
+    );
     await tester.tap(find.byKey(const ValueKey('daily-remembered')));
     await tester.pumpAndSettle();
 
