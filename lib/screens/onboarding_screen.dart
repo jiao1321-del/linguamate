@@ -139,7 +139,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       setState(() => _language = value);
                     },
                     onGoalChanged: (value) {
-                      setState(() => _goal = value);
+                      setState(() {
+                        _goal = value;
+                        if (value == 'Tagalog 日常') {
+                          _language = 'Tagalog';
+                        } else if (value == 'Taglish') {
+                          _language = 'Taglish';
+                        }
+                      });
                     },
                   ),
                   _ReadyPage(
