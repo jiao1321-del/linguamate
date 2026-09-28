@@ -83,6 +83,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   bool _coachExpanded = false;
   int? _savingIndex;
   String? _error;
+  String? _failedDraft;
   late List<AiChatMessage> _entries;
 
   @override
@@ -318,16 +319,22 @@ class _AiChatScreenState extends State<AiChatScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text(
+              '建議句子',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            Text(assessment.target),
+            const SizedBox(height: 8),
+            const Text(
+              '你說的內容',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            Text(assessment.transcript),
+            const SizedBox(height: 10),
             Text('完整度：${assessment.completeness}%'),
             Text('流暢度估計：${assessment.fluency}%'),
             const SizedBox(height: 10),
             Text(assessment.missingWordsLabel),
-            const SizedBox(height: 10),
-            const Text(
-              '建議版本',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
-            Text(assessment.naturalSuggestion),
             const SizedBox(height: 10),
             Text(
               '此分數依語音辨識文字比對估算，不是音素級發音診斷。',
@@ -791,17 +798,32 @@ class _AiChatScreenState extends State<AiChatScreen> {
     unawaited(_persistConversationSafely());
 
     try {
-      final baseScenario = _activeMission?.backendScenario ?? _scenario;
+      final baseScenario = _activeMission?.backendScenarioFor(
+            userTurns: _missionUserTurns,
+            learnerMessage: message,
+          ) ??
+          _scenario;
       final memory = widget.learnerMemory.trim();
       final effectiveScenario = memory.isEmpty
           ? baseScenario
           : '$baseScenario\n\nLearner memory: $memory\nUse this only to personalize difficulty and avoid reteaching mastered material.';
-      final reply = await widget.onSend(
-        message,
-        _targetLanguage,
-        effectiveScenario,
-        history,
-      );
+      AiCoachReply reply;
+      try {
+        reply = await widget.onSend(
+          message,
+          _targetLanguage,
+          effectiveScenario,
+          history,
+        );
+      } catch (_) {
+        await Future<void>.delayed(const Duration(milliseconds: 650));
+        reply = await widget.onSend(
+          message,
+          _targetLanguage,
+          effectiveScenario,
+          history,
+        );
+      }
       if (!mounted) return;
 
       setState(() {
@@ -812,6 +834,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
             reply: reply,
           ),
         );
+        _failedDraft = null;
+        _error = null;
       });
 
       final weaknessRecorder = widget.onWeaknessDetected;
@@ -824,7 +848,20 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _scrollToBottom();
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString());
+      setState(() {
+        if (_entries.isNotEmpty &&
+            _entries.last.mine &&
+            _entries.last.text == message) {
+          _entries.removeLast();
+        }
+        _failedDraft = message;
+        _error = error.toString();
+      });
+      _controller.value = TextEditingValue(
+        text: message,
+        selection: TextSelection.collapsed(offset: message.length),
+      );
+      unawaited(_persistConversationSafely());
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
@@ -1029,9 +1066,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _missionUserTurns >= 4
+                      _missionUserTurns >= _activeMission!.completionTurns
                           ? '✅ 任務已完成：${_activeMission!.title} · 可以打開學習包回顧'
-                          : '🎭 ${_activeMission!.title} · ${_activeMission!.goal} · $_missionUserTurns/4 回合',
+                          : '🎭 ${_activeMission!.title} · ${_activeMission!.stageForTurn(_missionUserTurns)} · $_missionUserTurns/${_activeMission!.completionTurns} 回合',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w700),
@@ -1089,7 +1126,40 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         color: Theme.of(context).colorScheme.error,
                       ),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(_error!)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'AI 連線異常 · 已自動重試 1 次',
+                              style: TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(_error!),
+                            if (_failedDraft != null) ...[
+                              const SizedBox(height: 8),
+                              FilledButton.tonalIcon(
+                                key: const ValueKey('retry-failed-chat'),
+                                onPressed: _isSending
+                                    ? null
+                                    : () {
+                                        _controller.value =
+                                            TextEditingValue(
+                                          text: _failedDraft!,
+                                          selection:
+                                              TextSelection.collapsed(
+                                            offset: _failedDraft!.length,
+                                          ),
+                                        );
+                                        _sendMessage();
+                                      },
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: const Text('重新傳送'),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
