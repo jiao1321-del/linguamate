@@ -24,13 +24,15 @@ class PluginSpeechCoachService implements SpeechCoachService {
   Future<void> speak({
     required String text,
     required String languageTag,
+    double rate = 0.46,
   }) async {
     final normalized = text.trim();
     if (normalized.isEmpty) return;
 
     await _tts.stop();
     await _tts.setLanguage(languageTag);
-    await _tts.setSpeechRate(0.46);
+    await _tts.setSpeechRate(rate.clamp(0.25, 0.65));
+    await _tts.awaitSpeakCompletion(true);
     await _tts.setPitch(1.02);
     await _tts.speak(normalized);
   }
