@@ -195,7 +195,7 @@ class _LiveVoiceScreenState extends State<LiveVoiceScreen> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _language,
+                              initialValue: _language,
                               decoration:
                                   const InputDecoration(labelText: '語言'),
                               items: const [
