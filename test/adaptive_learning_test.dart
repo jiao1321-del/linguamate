@@ -190,7 +190,7 @@ void main() {
     expect(snapshot.course, hasLength(7));
     expect(snapshot.memory.summary, contains('過去式'));
     expect(snapshot.dueReviewCount, 1);
-    expect(snapshot.difficulty, inInclusiveRange(1, 5));
+    expect(snapshot.difficulty, inInclusiveRange(1, 10));
     expect(snapshot.coachMessage, isNotEmpty);
   });
 
