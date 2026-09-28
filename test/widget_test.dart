@@ -46,6 +46,7 @@ class _FakeSpeechCoachService implements SpeechCoachService {
   Future<void> speak({
     required String text,
     required String languageTag,
+    double rate = 0.46,
   }) async {
     spoken.add('$languageTag:$text');
   }
