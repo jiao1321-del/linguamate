@@ -279,6 +279,133 @@ class _MainShellState extends State<MainShell> {
   }
 
 
+  Future<void> _loadTelemetry() async {
+    final items = await _telemetryStore.load();
+    if (!mounted) return;
+    setState(() => _trainingTelemetry = items);
+  }
+
+  Future<void> _loadCampaignProgress() async {
+    final completed = await _campaignStore.loadCompleted();
+    if (!mounted) return;
+    setState(() => _completedCampaignMissions = completed);
+  }
+
+  Future<void> _loadRoadmapProgress() async {
+    final results = await Future.wait<Object>([
+      _roadmapStore.loadGoal(),
+      _roadmapStore.loadCompleted(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _roadmapGoal = results[0] as String;
+      _completedRoadmapDays = results[1] as Set<String>;
+    });
+  }
+
+  Future<void> _loadLearnerMemory() async {
+    final profile = await _learnerMemoryStore.load();
+    if (!mounted) return;
+    setState(() => _learnerMemory = profile);
+  }
+
+  Future<void> _refreshLearnerMemory() async {
+    final chatState = await _aiChatStore.load();
+    final profile = LearnerMemoryEngine.build(
+      abilities: _abilityRecords,
+      weaknesses: _weaknesses,
+      mistakes: _mistakes,
+      speaking: _speakingHistory,
+      savedItems: _savedItems,
+      chatState: chatState,
+    );
+    await _learnerMemoryStore.save(profile);
+    if (!mounted) return;
+    setState(() => _learnerMemory = profile);
+  }
+
+  void _markLocalChanged({bool refreshMemory = true}) {
+    _localUpdatedAt = DateTime.now();
+    if (refreshMemory) {
+      unawaited(_refreshLearnerMemory());
+    }
+    _scheduleAutoSync();
+  }
+
+  void _scheduleAutoSync() {
+    if (!_autoSyncEnabled || _syncInProgress) return;
+    _cloudSyncDebounce?.cancel();
+    _cloudSyncDebounce = Timer(
+      const Duration(seconds: 2),
+      () => unawaited(_autoSyncNow()),
+    );
+  }
+
+  Future<void> _setAutoSyncEnabled(bool enabled) async {
+    await _cloudSyncService.setAutoSyncEnabled(enabled);
+    if (!mounted) return;
+    setState(() => _autoSyncEnabled = enabled);
+    if (enabled) {
+      await _autoSyncNow();
+    }
+  }
+
+  Future<void> _autoSyncNow() async {
+    if (_syncInProgress) return;
+    final session = await _cloudSyncService.loadSession();
+    if (session == null) {
+      if (mounted) {
+        setState(() => _cloudStatus = const CloudSyncStatus.signedOut());
+      }
+      return;
+    }
+
+    _syncInProgress = true;
+    if (mounted) {
+      setState(() {
+        _cloudStatus = CloudSyncStatus(
+          phase: CloudSyncPhase.syncing,
+          lastSyncedAt: _cloudStatus.lastSyncedAt,
+          email: session.email,
+        );
+      });
+    }
+
+    try {
+      final local = await _exportCloudPayload();
+      final cloud = await _cloudSyncService.download(session);
+      final merged = CloudPayloadMerger.merge(local, cloud);
+      await _importCloudPayload(merged, fromSync: true);
+      await _cloudSyncService.upload(session: session, payload: merged);
+      final syncedAt = DateTime.now();
+      if (!mounted) return;
+      setState(() {
+        _cloudStatus = CloudSyncStatus(
+          phase: CloudSyncPhase.synced,
+          lastSyncedAt: syncedAt,
+          email: session.email,
+        );
+      });
+    } catch (error) {
+      if (!mounted) return;
+      final text = error.toString().toLowerCase();
+      final offline = text.contains('network') ||
+          text.contains('host') ||
+          text.contains('socket') ||
+          text.contains('connection');
+      setState(() {
+        _cloudStatus = CloudSyncStatus(
+          phase: offline ? CloudSyncPhase.offline : CloudSyncPhase.error,
+          lastSyncedAt: _cloudStatus.lastSyncedAt,
+          message: error.toString(),
+          email: session.email,
+        );
+      });
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
   Future<void> _updateDailyGoal(int goal) async {
     await _dailyGoalStore.save(goal);
     if (!mounted) return;
