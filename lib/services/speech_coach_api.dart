@@ -5,6 +5,7 @@ abstract class SpeechCoachService {
   Future<void> speak({
     required String text,
     required String languageTag,
+    double rate = 0.46,
   });
 
   Future<String?> listen({
