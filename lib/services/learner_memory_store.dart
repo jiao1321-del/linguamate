@@ -13,16 +13,16 @@ class LearnerMemoryStore {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
     if (raw == null || raw.trim().isEmpty) {
-      return const LearnerMemoryProfile.empty();
+      return LearnerMemoryProfile.empty();
     }
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! Map) return const LearnerMemoryProfile.empty();
+      if (decoded is! Map) return LearnerMemoryProfile.empty();
       return LearnerMemoryProfile.fromJson(
         Map<String, dynamic>.from(decoded),
       );
     } catch (_) {
-      return const LearnerMemoryProfile.empty();
+      return LearnerMemoryProfile.empty();
     }
   }
 
