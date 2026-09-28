@@ -387,6 +387,11 @@ void main() {
       find.byKey(const ValueKey('start-next-best-action')),
       findsOneWidget,
     );
+    await tester.scrollUntilVisible(
+      find.textContaining('V1.37'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.textContaining('V1.37'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.textContaining('V1.45'),
