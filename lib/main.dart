@@ -312,12 +312,20 @@ class _MainShellState extends State<MainShell> {
       explanation:
           '辨識：${assessment.transcript} · 完整度 ${assessment.completeness}% · 流暢度 ${assessment.fluency}%',
     );
-    final abilities = await _learningAbilityStore.recordResult(
-      task: task,
-      correct: assessment.passed,
-    );
+    final results = await Future.wait<Object>([
+      _learningAbilityStore.recordResult(
+        task: task,
+        correct: assessment.passed,
+      ),
+      _speakingHistoryStore.append(assessment),
+    ]);
     if (!mounted) return;
-    setState(() => _abilityRecords = abilities);
+    setState(() {
+      _abilityRecords =
+          results[0] as List<LearningAbilityRecord>;
+      _speakingHistory =
+          results[1] as List<SpeakingAttempt>;
+    });
   }
 
   Future<void> _startMistakeTraining() async {
