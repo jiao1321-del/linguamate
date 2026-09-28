@@ -80,6 +80,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   bool _isRestoring = true;
   bool _isSending = false;
   bool _isListening = false;
+  bool _coachExpanded = false;
   int? _savingIndex;
   String? _error;
   late List<AiChatMessage> _entries;
@@ -899,7 +900,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return SafeArea(
       child: Column(
         children: [
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
           ShiliCoachHeader(
             targetLanguage: _targetLanguage,
             scenario: _scenario,
@@ -918,56 +919,106 @@ class _AiChatScreenState extends State<AiChatScreen> {
           if (widget.proactiveCoachMessage.trim().isNotEmpty)
             Container(
               key: const ValueKey('proactive-shili-coach'),
-              margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
               decoration: BoxDecoration(
                 color: const Color(0xFFF4EEFF),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.auto_awesome_rounded, size: 20),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'Shili 今日建議',
-                          style: TextStyle(fontWeight: FontWeight.w900),
-                        ),
+                  InkWell(
+                    key: const ValueKey('toggle-proactive-coach'),
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () {
+                      setState(() => _coachExpanded = !_coachExpanded);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.auto_awesome_rounded, size: 18),
+                          const SizedBox(width: 7),
+                          const Text(
+                            '今日建議',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              widget.proactiveCoachMessage,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                          Icon(
+                            _coachExpanded
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            size: 22,
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(widget.proactiveCoachMessage),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.tonalIcon(
-                        key: const ValueKey('start-coach-recommendation'),
-                        onPressed: widget.onStartRecommendedTraining,
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        label: const Text('開始建議訓練'),
+                  if (_coachExpanded)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 11),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Divider(height: 1),
+                          const SizedBox(height: 9),
+                          Text(widget.proactiveCoachMessage),
+                          const SizedBox(height: 9),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.tonalIcon(
+                                  key: const ValueKey(
+                                    'start-coach-recommendation',
+                                  ),
+                                  onPressed:
+                                      widget.onStartRecommendedTraining,
+                                  icon: const Icon(
+                                    Icons.play_arrow_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text('開始訓練'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  key: const ValueKey(
+                                    'start-speaking-assessment',
+                                  ),
+                                  onPressed: _isListening
+                                      ? null
+                                      : _startSpeakingAssessment,
+                                  icon: const Icon(
+                                    Icons.record_voice_over_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('口說評分'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      OutlinedButton.icon(
-                        key: const ValueKey('start-speaking-assessment'),
-                        onPressed: _isListening ? null : _startSpeakingAssessment,
-                        icon: const Icon(Icons.record_voice_over_outlined),
-                        label: const Text('口說評分'),
-                      ),
-                    ],
-                  ),
+                    ),
                 ],
               ),
             ),
           if (_activeMission != null)
             Container(
               key: const ValueKey('active-roleplay-mission'),
-              margin: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-              padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 5),
+              padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
               decoration: BoxDecoration(
                 color: const Color(0xFFF4EEFF),
                 borderRadius: BorderRadius.circular(16),
@@ -996,11 +1047,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 ],
               ),
             ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 1),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              padding: const EdgeInsets.fromLTRB(12, 5, 12, 10),
               itemCount: _entries.length + (_isSending ? 1 : 0),
               itemBuilder: (context, index) {
                 if (_isSending && index == _entries.length) {
@@ -1045,7 +1096,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               ),
             ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -1055,7 +1106,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     controller: _controller,
                     enabled: !_isRestoring && _savingIndex == null,
                     minLines: 1,
-                    maxLines: 4,
+                    maxLines: 3,
                     keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) {
@@ -1070,7 +1121,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide.none,
                       ),
                     ),
@@ -1078,8 +1129,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 ),
                 const SizedBox(width: 8),
                 SizedBox(
-                  width: 46,
-                  height: 50,
+                  width: 42,
+                  height: 44,
                   child: IconButton(
                     key: const ValueKey('voice-chat-input'),
                     tooltip: '語音輸入',
@@ -1097,8 +1148,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 ),
                 const SizedBox(width: 4),
                 SizedBox(
-                  width: 50,
-                  height: 50,
+                  width: 46,
+                  height: 46,
                   child: IconButton.filled(
                     key: const ValueKey('send-chat-message'),
                     tooltip: '送出',
