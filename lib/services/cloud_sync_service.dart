@@ -20,8 +20,34 @@ class CloudSyncService {
   static const _publishableKey =
       'sb_publishable_UoxuXbXG8Qvy0Snte4jmPQ_IIPI-IzR';
   static const _sessionKey = 'linguamate_cloud_session_v136';
+  static const _autoSyncKey = 'linguamate_cloud_auto_sync_v137';
+  static const _lastSyncKey = 'linguamate_cloud_last_sync_v137';
 
   const CloudSyncService();
+
+  Future<bool> loadAutoSyncEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_autoSyncKey) ?? true;
+  }
+
+  Future<void> setAutoSyncEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_autoSyncKey, enabled);
+  }
+
+  Future<DateTime?> loadLastSyncedAt() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_lastSyncKey);
+    return raw == null ? null : DateTime.tryParse(raw);
+  }
+
+  Future<void> markSynced([DateTime? at]) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _lastSyncKey,
+      (at ?? DateTime.now()).toUtc().toIso8601String(),
+    );
+  }
 
   Future<CloudSession?> loadSession() async {
     final prefs = await SharedPreferences.getInstance();
@@ -107,6 +133,7 @@ class CloudSyncService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw CloudSyncException(_errorMessage(response));
     }
+    await markSynced();
   }
 
   Future<Map<String, dynamic>?> download(
