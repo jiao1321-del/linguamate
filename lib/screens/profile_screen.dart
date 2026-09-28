@@ -16,6 +16,9 @@ class ProfileScreen extends StatelessWidget {
   final VoidCallback? onOpenProgress;
   final VoidCallback? onOpenGrowth;
   final VoidCallback? onOpenAdaptive;
+  final VoidCallback? onOpenSpeaking;
+  final VoidCallback? onOpenCourse;
+  final VoidCallback? onOpenCloud;
   final VoidCallback onOpenBackup;
 
   const ProfileScreen({
@@ -32,6 +35,9 @@ class ProfileScreen extends StatelessWidget {
     this.onOpenProgress,
     this.onOpenGrowth,
     this.onOpenAdaptive,
+    this.onOpenSpeaking,
+    this.onOpenCourse,
+    this.onOpenCloud,
     required this.onOpenBackup,
   });
 
@@ -195,6 +201,57 @@ class ProfileScreen extends StatelessWidget {
               ),
               subtitle: const Text(
                 '智慧複習、主動教練、口說評分、7 天課程、學習記憶與個人難度',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            key: const ValueKey('speaking-progress-entry'),
+            child: ListTile(
+              onTap: onOpenSpeaking,
+              contentPadding: const EdgeInsets.all(18),
+              leading: const Icon(Icons.record_voice_over_outlined),
+              title: const Text(
+                '口說教練 2.0',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: const Text(
+                '查看最近 7 次口說分數、完整度、流暢度與漏字紀錄',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            key: const ValueKey('course-plan-entry'),
+            child: ListTile(
+              onTap: onOpenCourse,
+              contentPadding: const EdgeInsets.all(18),
+              leading: const Icon(Icons.auto_stories_outlined),
+              title: const Text(
+                'AI 個人課程 2.0',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: const Text(
+                '依弱點生成章節；完成素材、句型、口說、情境與小測驗後解鎖下一章',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            key: const ValueKey('cloud-sync-entry'),
+            child: ListTile(
+              onTap: onOpenCloud,
+              contentPadding: const EdgeInsets.all(18),
+              leading: const Icon(Icons.cloud_sync_outlined),
+              title: const Text(
+                'LinguaMate Cloud',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: const Text(
+                '帳號登入與雲端同步：收藏、錯題、能力、口說、課程與 Shili 對話',
               ),
               trailing: const Icon(Icons.chevron_right_rounded),
             ),

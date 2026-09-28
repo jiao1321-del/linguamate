@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'models/adaptive_learning.dart';
+import 'models/ai_chat_state.dart';
 import 'models/ai_coach_reply.dart';
 import 'models/daily_training.dart';
 import 'models/language_analysis.dart';
@@ -9,10 +10,13 @@ import 'models/learning_ability.dart';
 import 'models/learning_path.dart';
 import 'models/learning_progress.dart';
 import 'models/mistake_record.dart';
+import 'models/speaking_attempt.dart';
 import 'models/weakness_record.dart';
 import 'screens/adaptive_learning_screen.dart';
 import 'screens/ai_chat_screen.dart';
 import 'screens/backup_screen.dart';
+import 'screens/cloud_sync_screen.dart';
+import 'screens/course_plan_screen.dart';
 import 'screens/daily_training_screen.dart';
 import 'screens/growth_center_screen.dart';
 import 'screens/home_screen.dart';
@@ -21,9 +25,13 @@ import 'screens/profile_screen.dart';
 import 'screens/progress_center_screen.dart';
 import 'screens/review_screen.dart';
 import 'screens/saved_screen.dart';
+import 'screens/speaking_progress_screen.dart';
+import 'services/adaptive_course_generator.dart';
 import 'services/adaptive_learning_engine.dart';
 import 'services/ai_chat_service.dart';
 import 'services/ai_chat_store.dart';
+import 'services/cloud_sync_service.dart';
+import 'services/course_progress_store.dart';
 import 'services/daily_training_plan_builder.dart';
 import 'services/daily_training_store.dart';
 import 'services/daily_goal_store.dart';
@@ -34,6 +42,7 @@ import 'services/learning_path_planner.dart';
 import 'services/learning_progress_store.dart';
 import 'services/learning_store.dart';
 import 'services/mistake_store.dart';
+import 'services/speaking_history_store.dart';
 import 'services/weakness_classifier.dart';
 import 'services/weakness_store.dart';
 
@@ -77,6 +86,9 @@ class _MainShellState extends State<MainShell> {
   final _mistakeStore = const MistakeStore();
   final _learningAbilityStore = const LearningAbilityStore();
   final _learningProgressStore = const LearningProgressStore();
+  final _speakingHistoryStore = const SpeakingHistoryStore();
+  final _courseProgressStore = const CourseProgressStore();
+  final _cloudSyncService = const CloudSyncService();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
@@ -87,8 +99,11 @@ class _MainShellState extends State<MainShell> {
   List<MistakeRecord> _mistakes = const [];
   List<LearningAbilityRecord> _abilityRecords = const [];
   List<DailyTrainingSummary> _trainingHistory = const [];
+  List<SpeakingAttempt> _speakingHistory = const [];
+  Set<String> _completedCourseChapters = <String>{};
   DailyTrainingSummary? _dailyTrainingSummary;
   int _dailyGoal = DailyGoalStore.defaultGoal;
+  int _dataRevision = 0;
 
   @override
   void initState() {
@@ -100,6 +115,8 @@ class _MainShellState extends State<MainShell> {
     _loadLearningAbility();
     _loadLearningProgress();
     _loadDailyGoal();
+    _loadSpeakingHistory();
+    _loadCourseProgress();
   }
 
   Future<void> _loadSavedItems() async {
@@ -164,10 +181,45 @@ class _MainShellState extends State<MainShell> {
     setState(() => _dailyGoal = goal);
   }
 
+  Future<void> _loadSpeakingHistory() async {
+    final attempts = await _speakingHistoryStore.load();
+    if (!mounted) return;
+    setState(() => _speakingHistory = attempts);
+  }
+
+  Future<void> _loadCourseProgress() async {
+    final completed = await _courseProgressStore.loadCompleted();
+    if (!mounted) return;
+    setState(() => _completedCourseChapters = completed);
+  }
+
+
   Future<void> _updateDailyGoal(int goal) async {
     await _dailyGoalStore.save(goal);
     if (!mounted) return;
     setState(() => _dailyGoal = goal);
+  }
+
+  String _speakingMemoryHint() {
+    if (_speakingHistory.isEmpty) return '';
+    final recent = _speakingHistory.take(7).toList(growable: false);
+    final average =
+        (recent.fold<int>(0, (sum, item) => sum + item.score) / recent.length)
+            .round();
+    final counts = <String, int>{};
+    for (final attempt in recent) {
+      for (final word in attempt.missingWords) {
+        final normalized = word.trim().toLowerCase();
+        if (normalized.isEmpty) continue;
+        counts[normalized] = (counts[normalized] ?? 0) + 1;
+      }
+    }
+    final ranked = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final missing = ranked.take(3).map((item) => item.key).join('、');
+    return missing.isEmpty
+        ? '最近口說平均 $average 分'
+        : '最近口說平均 $average 分；常漏字：$missing';
   }
 
   LearningAbilityReport _buildAbilityReport() {
@@ -282,12 +334,20 @@ class _MainShellState extends State<MainShell> {
       explanation:
           '辨識：${assessment.transcript} · 完整度 ${assessment.completeness}% · 流暢度 ${assessment.fluency}%',
     );
-    final abilities = await _learningAbilityStore.recordResult(
-      task: task,
-      correct: assessment.passed,
-    );
+    final results = await Future.wait<Object>([
+      _learningAbilityStore.recordResult(
+        task: task,
+        correct: assessment.passed,
+      ),
+      _speakingHistoryStore.append(assessment),
+    ]);
     if (!mounted) return;
-    setState(() => _abilityRecords = abilities);
+    setState(() {
+      _abilityRecords =
+          results[0] as List<LearningAbilityRecord>;
+      _speakingHistory =
+          results[1] as List<SpeakingAttempt>;
+    });
   }
 
   Future<void> _startMistakeTraining() async {
@@ -505,6 +565,174 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
+  Future<void> _openSpeakingProgress() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => SpeakingProgressScreen(
+          attempts: _speakingHistory,
+        ),
+      ),
+    );
+  }
+
+  Future<Set<String>> _completeCourseChapter(String chapterId) async {
+    final completed = await _courseProgressStore.complete(chapterId);
+    if (mounted) {
+      setState(() => _completedCourseChapters = completed);
+    }
+    return completed;
+  }
+
+  Future<void> _openCoursePlan() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    final plan = AdaptiveCourseGenerator.generate(
+      abilityReport: abilityReport,
+      progressReport: progressReport,
+      mistakes: _mistakes,
+      weaknesses: _weaknesses,
+    );
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => CoursePlanScreen(
+          plan: plan,
+          initialCompleted: _completedCourseChapters,
+          onCompleteChapter: _completeCourseChapter,
+          onAction: _handleAdaptiveAction,
+        ),
+      ),
+    );
+  }
+
+  List<T> _decodeCloudList<T>(
+    dynamic raw,
+    T Function(Map<String, dynamic> json) parser,
+  ) {
+    if (raw is! List) return <T>[];
+    final items = <T>[];
+    for (final entry in raw.whereType<Map>()) {
+      try {
+        items.add(parser(Map<String, dynamic>.from(entry)));
+      } catch (_) {}
+    }
+    return items;
+  }
+
+  Future<Map<String, dynamic>> _exportCloudPayload() async {
+    final chatState = await _aiChatStore.load();
+    return {
+      'schemaVersion': 136,
+      'savedItems': _savedItems.map((item) => item.toJson()).toList(),
+      'weaknesses': _weaknesses.map((item) => item.toJson()).toList(),
+      'mistakes': _mistakes.map((item) => item.toJson()).toList(),
+      'abilities': _abilityRecords.map((item) => item.toJson()).toList(),
+      'trainingHistory':
+          _trainingHistory.map((item) => item.toJson()).toList(),
+      'dailyGoal': _dailyGoal,
+      'speakingHistory':
+          _speakingHistory.map((item) => item.toJson()).toList(),
+      'courseCompleted': _completedCourseChapters.toList(),
+      'chatState': chatState?.toJson(),
+      'syncedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
+
+  Future<void> _importCloudPayload(Map<String, dynamic> payload) async {
+    final items = _decodeCloudList<LearningItem>(
+      payload['savedItems'],
+      LearningItem.fromJson,
+    );
+    final weaknesses = _decodeCloudList<WeaknessRecord>(
+      payload['weaknesses'],
+      WeaknessRecord.fromJson,
+    );
+    final mistakes = _decodeCloudList<MistakeRecord>(
+      payload['mistakes'],
+      MistakeRecord.fromJson,
+    );
+    final abilities = _decodeCloudList<LearningAbilityRecord>(
+      payload['abilities'],
+      LearningAbilityRecord.fromJson,
+    );
+    final history = _decodeCloudList<DailyTrainingSummary>(
+      payload['trainingHistory'],
+      DailyTrainingSummary.fromJson,
+    );
+    final speaking = _decodeCloudList<SpeakingAttempt>(
+      payload['speakingHistory'],
+      SpeakingAttempt.fromJson,
+    );
+    final completedRaw = payload['courseCompleted'];
+    final completed = completedRaw is List
+        ? completedRaw.whereType<String>().toSet()
+        : <String>{};
+    final goal = (payload['dailyGoal'] as num?)?.toInt() ??
+        DailyGoalStore.defaultGoal;
+    final rawChat = payload['chatState'];
+    final chatState = rawChat is Map
+        ? AiChatState.fromJson(Map<String, dynamic>.from(rawChat))
+        : null;
+
+    await _learningStore.saveItems(items);
+    await _weaknessStore.replace(weaknesses);
+    await _mistakeStore.replace(mistakes);
+    await _learningAbilityStore.replace(abilities);
+    await _learningProgressStore.replace(history);
+    await _dailyGoalStore.save(goal);
+    await _speakingHistoryStore.replace(speaking);
+    await _courseProgressStore.replace(completed);
+
+    if (chatState == null) {
+      await _aiChatStore.clear();
+    } else {
+      await _aiChatStore.save(chatState);
+    }
+
+    if (history.isEmpty) {
+      await _dailyTrainingStore.clear();
+    } else {
+      await _dailyTrainingStore.save(history.first);
+    }
+
+    if (!mounted) return;
+    final replies = chatState?.messages
+            .map((message) => message.reply)
+            .whereType<AiCoachReply>()
+            .toList(growable: false) ??
+        const <AiCoachReply>[];
+
+    setState(() {
+      _savedItems = items;
+      _weaknesses = weaknesses;
+      _mistakes = mistakes;
+      _abilityRecords = abilities;
+      _trainingHistory = history;
+      _dailyTrainingSummary = history.isEmpty ? null : history.first;
+      _dailyGoal = DailyGoalStore.supportedGoals.contains(goal)
+          ? goal
+          : DailyGoalStore.defaultGoal;
+      _speakingHistory = speaking;
+      _completedCourseChapters = completed;
+      _coachReplies = replies;
+      _isLoadingSavedItems = false;
+      _isLoadingWeaknesses = false;
+      _dataRevision++;
+    });
+  }
+
+  Future<void> _openCloudSync() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => CloudSyncScreen(
+          service: _cloudSyncService,
+          exportLocal: _exportCloudPayload,
+          importCloud: _importCloudPayload,
+        ),
+      ),
+    );
+  }
+
   void _handleAdaptiveAction(String action) {
     switch (action) {
       case 'mistakes':
@@ -678,12 +906,16 @@ class _MainShellState extends State<MainShell> {
         onSaved: _openSavedItems,
       ),
       AiChatScreen(
+        key: ValueKey('ai-chat-$_dataRevision'),
         onSend: _aiChatService.send,
         onSaveLearning: _saveChatLearningItem,
         onWeaknessDetected: _recordChatWeakness,
         onLearningPackUpdated: _captureLearningPack,
         proactiveCoachMessage: adaptiveSnapshot.coachMessage,
-        learnerMemory: adaptiveSnapshot.memory.summary,
+        learnerMemory: [
+          adaptiveSnapshot.memory.summary,
+          _speakingMemoryHint(),
+        ].where((item) => item.trim().isNotEmpty).join('；'),
         onSpeakingResult: _recordSpeakingResult,
         onStartRecommendedTraining: () =>
             _handleAdaptiveAction(adaptiveSnapshot.recommendedAction),
@@ -705,6 +937,9 @@ class _MainShellState extends State<MainShell> {
         onOpenProgress: _openProgressCenter,
         onOpenGrowth: _openGrowthCenter,
         onOpenAdaptive: _openAdaptiveLearning,
+        onOpenSpeaking: _openSpeakingProgress,
+        onOpenCourse: _openCoursePlan,
+        onOpenCloud: _openCloudSync,
         onOpenBackup: _openBackup,
       ),
     ];

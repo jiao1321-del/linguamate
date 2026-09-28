@@ -75,6 +75,8 @@ class WeaknessStore {
     return sorted;
   }
 
+  Future<void> replace(List<WeaknessRecord> records) => _save(_sorted(records));
+
   Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);

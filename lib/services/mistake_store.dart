@@ -70,6 +70,8 @@ class MistakeStore {
     return sorted;
   }
 
+  Future<void> replace(List<MistakeRecord> items) => _save(_sorted(items));
+
   Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
