@@ -15,6 +15,7 @@ class ProfileScreen extends StatelessWidget {
   final VoidCallback? onPracticeMistakes;
   final VoidCallback? onOpenProgress;
   final VoidCallback? onOpenGrowth;
+  final VoidCallback? onOpenAdaptive;
   final VoidCallback onOpenBackup;
 
   const ProfileScreen({
@@ -30,6 +31,7 @@ class ProfileScreen extends StatelessWidget {
     this.onPracticeMistakes,
     this.onOpenProgress,
     this.onOpenGrowth,
+    this.onOpenAdaptive,
     required this.onOpenBackup,
   });
 
@@ -176,6 +178,23 @@ class ProfileScreen extends StatelessWidget {
               ),
               subtitle: const Text(
                 '每日目標、XP 等級、成就徽章、近 7 天週報與 28 天學習日曆',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            key: const ValueKey('adaptive-learning-entry'),
+            child: ListTile(
+              onTap: onOpenAdaptive,
+              contentPadding: const EdgeInsets.all(18),
+              leading: const Icon(Icons.hub_outlined),
+              title: const Text(
+                'Shili 自適應學習',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: const Text(
+                '智慧複習、主動教練、口說評分、7 天課程、學習記憶與個人難度',
               ),
               trailing: const Icon(Icons.chevron_right_rounded),
             ),

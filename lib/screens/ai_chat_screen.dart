@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../models/adaptive_learning.dart';
 import '../models/ai_chat_state.dart';
 import '../models/ai_coach_reply.dart';
 import '../models/roleplay_mission.dart';
+import '../services/adaptive_learning_engine.dart';
 import '../services/ai_chat_store.dart';
 import '../services/practice_starter_service.dart';
 import '../services/roleplay_mission_service.dart';
@@ -25,6 +27,9 @@ typedef ChatWeaknessRecorder = Future<void> Function(
   String userText,
   AiCoachReply reply,
 );
+typedef SpeakingResultRecorder = Future<void> Function(
+  PronunciationAssessment assessment,
+);
 
 class AiChatScreen extends StatefulWidget {
   final AiCoachSender onSend;
@@ -33,6 +38,10 @@ class AiChatScreen extends StatefulWidget {
   final ValueChanged<AiCoachReply>? onLearningPackUpdated;
   final SpeechCoachService? speechService;
   final AiChatStore chatStore;
+  final String proactiveCoachMessage;
+  final String learnerMemory;
+  final SpeakingResultRecorder? onSpeakingResult;
+  final VoidCallback? onStartRecommendedTraining;
 
   const AiChatScreen({
     super.key,
@@ -42,6 +51,10 @@ class AiChatScreen extends StatefulWidget {
     this.onLearningPackUpdated,
     this.speechService,
     this.chatStore = const AiChatStore(),
+    this.proactiveCoachMessage = '',
+    this.learnerMemory = '',
+    this.onSpeakingResult,
+    this.onStartRecommendedTraining,
   });
 
   @override
@@ -229,6 +242,106 @@ class _AiChatScreenState extends State<AiChatScreen> {
     } finally {
       if (mounted) setState(() => _isListening = false);
     }
+  }
+
+  String get _speakingTarget {
+    for (final entry in _entries.reversed) {
+      if (entry.mine) continue;
+      final reply = entry.reply;
+      if (reply != null) {
+        final correction = reply.correction.trim();
+        if (correction.isNotEmpty) return correction;
+        final text = reply.reply.trim();
+        if (text.isNotEmpty) return text;
+      }
+    }
+
+    return switch (_targetLanguage) {
+      'Tagalog' => 'Kaya kong magsalita nang mas natural araw-araw.',
+      'Taglish' => 'I want to speak more naturally every day.',
+      _ => 'I want to speak more naturally every day.',
+    };
+  }
+
+  Future<void> _startSpeakingAssessment() async {
+    if (_isListening || _isSending || _isRestoring) return;
+
+    if (!_speechService.canListen) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('目前裝置無法使用語音辨識。')),
+      );
+      return;
+    }
+
+    final target = _speakingTarget;
+    await _speakText(target);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('跟著念：$target'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+
+    setState(() => _isListening = true);
+    String? transcript;
+    try {
+      transcript = await _speechService.listen(
+        languageTag: _speechLanguageTag,
+      );
+    } finally {
+      if (mounted) setState(() => _isListening = false);
+    }
+
+    if (!mounted) return;
+    if (transcript == null || transcript.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('沒有辨識到語音，請再試一次。')),
+      );
+      return;
+    }
+
+    final assessment = AdaptiveLearningEngine.assessPronunciation(
+      target: target,
+      transcript: transcript,
+    );
+    await widget.onSpeakingResult?.call(assessment);
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('口說評分 · ${assessment.score} 分'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('完整度：${assessment.completeness}%'),
+            Text('流暢度估計：${assessment.fluency}%'),
+            const SizedBox(height: 10),
+            Text(assessment.missingWordsLabel),
+            const SizedBox(height: 10),
+            const Text(
+              '建議版本',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            Text(assessment.naturalSuggestion),
+            const SizedBox(height: 10),
+            Text(
+              '此分數依語音辨識文字比對估算，不是音素級發音診斷。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('完成'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _changeTarget(String language) async {
@@ -677,8 +790,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
     unawaited(_persistConversationSafely());
 
     try {
-      final effectiveScenario =
-          _activeMission?.backendScenario ?? _scenario;
+      final baseScenario = _activeMission?.backendScenario ?? _scenario;
+      final memory = widget.learnerMemory.trim();
+      final effectiveScenario = memory.isEmpty
+          ? baseScenario
+          : '$baseScenario\n\nLearner memory: $memory\nUse this only to personalize difficulty and avoid reteaching mastered material.';
       final reply = await widget.onSend(
         message,
         _targetLanguage,
@@ -799,6 +915,54 @@ class _AiChatScreenState extends State<AiChatScreen> {
             onReviewConversation: _showConversationReview,
             onClearConversation: _clearConversation,
           ),
+          if (widget.proactiveCoachMessage.trim().isNotEmpty)
+            Container(
+              key: const ValueKey('proactive-shili-coach'),
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4EEFF),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.auto_awesome_rounded, size: 20),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Shili 今日建議',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(widget.proactiveCoachMessage),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        key: const ValueKey('start-coach-recommendation'),
+                        onPressed: widget.onStartRecommendedTraining,
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('開始建議訓練'),
+                      ),
+                      OutlinedButton.icon(
+                        key: const ValueKey('start-speaking-assessment'),
+                        onPressed: _isListening ? null : _startSpeakingAssessment,
+                        icon: const Icon(Icons.record_voice_over_outlined),
+                        label: const Text('口說評分'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           if (_activeMission != null)
             Container(
               key: const ValueKey('active-roleplay-mission'),

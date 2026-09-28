@@ -143,10 +143,22 @@ class LearningGrowthSnapshot {
         previousWeek.fold(0, (sum, item) => sum + item.totalTasks);
 
     final streak = report.streakAt(now);
+    final speakingRecords = report.abilityReport.records
+        .where((item) => item.type == 'speaking');
+    final speakingAttempts = speakingRecords.fold(
+      0,
+      (sum, item) => sum + item.attempts,
+    );
+    final speakingCorrect = speakingRecords.fold(
+      0,
+      (sum, item) => sum + item.correctCount,
+    );
     final xp = (report.totalCorrect * 10) +
         (report.totalTasks * 2) +
         (report.completedDays * 15) +
-        (streak * 5);
+        (streak * 5) +
+        (speakingAttempts * 4) +
+        (speakingCorrect * 8);
     final level = (xp ~/ xpPerLevel) + 1;
     final xpIntoLevel = xp % xpPerLevel;
 

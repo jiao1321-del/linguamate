@@ -35,15 +35,24 @@ class DailyTrainingScreen extends StatefulWidget {
 }
 
 class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
+  late List<DailyTrainingTask> _tasks;
   int _index = 0;
   int _correct = 0;
   int? _selectedChoice;
   bool _revealed = false;
   bool _finished = false;
   bool _saving = false;
+  int _consecutiveWrong = 0;
+  String? _adaptiveNotice;
   final Map<String, int> _correctByType = <String, int>{};
 
-  DailyTrainingTask get _task => widget.plan.tasks[_index];
+  @override
+  void initState() {
+    super.initState();
+    _tasks = [...widget.plan.tasks];
+  }
+
+  DailyTrainingTask get _task => _tasks[_index];
 
   Future<void> _choose(int choice) async {
     if (_selectedChoice != null || _saving) return;
@@ -63,6 +72,41 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
       await widget.onReviewResult(learningItemId, isCorrect);
     }
     await widget.onTaskResult?.call(task, isCorrect);
+    _adaptAfterResult(task, isCorrect);
+  }
+
+  void _adaptAfterResult(DailyTrainingTask task, bool correct) {
+    if (correct) {
+      _consecutiveWrong = 0;
+      if (_adaptiveNotice != null && mounted) {
+        setState(() => _adaptiveNotice = null);
+      }
+      return;
+    }
+
+    _consecutiveWrong++;
+    if (_consecutiveWrong < 2 || _index >= _tasks.length - 1) return;
+
+    final remaining = _tasks.sublist(_index + 1);
+    final sameType =
+        remaining.where((item) => item.type == task.type).toList();
+    final otherType =
+        remaining.where((item) => item.type != task.type).toList();
+    if (sameType.isEmpty) {
+      _consecutiveWrong = 0;
+      return;
+    }
+
+    setState(() {
+      _tasks = [
+        ..._tasks.take(_index + 1),
+        ...sameType,
+        ...otherType,
+      ];
+      _adaptiveNotice =
+          'Shili 偵測到連續失誤，已把「${_typeLabel(task.type)}」同類題提前補強。';
+    });
+    _consecutiveWrong = 0;
   }
 
   Future<void> _rateSelf(bool remembered) async {
@@ -81,6 +125,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
       await widget.onReviewResult(learningItemId, remembered);
     }
     await widget.onTaskResult?.call(task, remembered);
+    _adaptAfterResult(task, remembered);
 
     if (!mounted) return;
     setState(() => _saving = false);
@@ -88,7 +133,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
   }
 
   Future<void> _advance() async {
-    if (_index < widget.plan.tasks.length - 1) {
+    if (_index < _tasks.length - 1) {
       setState(() {
         _index++;
         _selectedChoice = null;
@@ -99,7 +144,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
 
     final summary = DailyTrainingSummary(
       dateKey: DailyTrainingSummary.keyFor(DateTime.now()),
-      totalTasks: widget.plan.totalTasks,
+      totalTasks: _tasks.length,
       correctTasks: _correct,
       completedAt: DateTime.now(),
       typeTotals: {
@@ -127,7 +172,8 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
     setState(() => _finished = true);
   }
 
-  int _totalFor(String type) => widget.plan.countType(type);
+  int _totalFor(String type) =>
+      _tasks.where((task) => task.type == type).length;
 
   int _correctFor(String type) => _correctByType[type] ?? 0;
 
@@ -171,7 +217,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                '$_correct / ${widget.plan.totalTasks} 題完成',
+                '$_correct / ${_tasks.length} 題完成',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
@@ -231,17 +277,33 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
                 children: [
                   Expanded(
                     child: LinearProgressIndicator(
-                      value: (_index + 1) / widget.plan.totalTasks,
+                      value: (_index + 1) / _tasks.length,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    '${_index + 1} / ${widget.plan.totalTasks}',
+                    '${_index + 1} / ${_tasks.length}',
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 10),
+              if (_adaptiveNotice != null)
+                Container(
+                  key: const ValueKey('adaptive-training-notice'),
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4EEFF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _adaptiveNotice!,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              const SizedBox(height: 8),
               Expanded(
                 child: ListView(
                   children: [
@@ -329,7 +391,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
                                     key: const ValueKey('daily-next-task'),
                                     onPressed: _advance,
                                     child: Text(
-                                      _index == widget.plan.totalTasks - 1
+                                      _index == _tasks.length - 1
                                           ? '查看結果'
                                           : '下一題',
                                     ),
