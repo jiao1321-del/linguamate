@@ -134,18 +134,38 @@ void main() {
     final secondCard = tester.widget<Card>(second);
     expect(secondCard, isNotNull);
 
+    final firstChapter = find.byKey(
+      const ValueKey('course-chapter-foundation'),
+    );
     await tester.scrollUntilVisible(
-      find.text('完成本章並解鎖下一章').first,
+      firstChapter,
       -250,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('完成本章並解鎖下一章').first);
+    final firstComplete = find.descendant(
+      of: firstChapter,
+      matching: find.widgetWithText(
+        FilledButton,
+        '完成本章並解鎖下一章',
+      ),
+    );
+    await tester.tap(firstComplete);
     await tester.pumpAndSettle();
 
-    final buttons = tester.widgetList<FilledButton>(
-      find.widgetWithText(FilledButton, '完成本章並解鎖下一章'),
+    await tester.scrollUntilVisible(
+      second,
+      250,
+      scrollable: find.byType(Scrollable).first,
     );
-    expect(buttons.any((button) => button.onPressed != null), isTrue);
+    final secondComplete = find.descendant(
+      of: second,
+      matching: find.widgetWithText(
+        FilledButton,
+        '完成本章並解鎖下一章',
+      ),
+    );
+    final secondButton = tester.widget<FilledButton>(secondComplete);
+    expect(secondButton.onPressed, isNotNull);
   });
 
   testWidgets('V1.32 retries AI once and preserves failed draft',
