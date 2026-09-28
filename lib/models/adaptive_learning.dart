@@ -1,5 +1,21 @@
 import 'learning_item.dart';
 
+enum SpeakingTokenStatus {
+  correct,
+  missing,
+  extra,
+}
+
+class SpeakingTokenFeedback {
+  final String word;
+  final SpeakingTokenStatus status;
+
+  const SpeakingTokenFeedback({
+    required this.word,
+    required this.status,
+  });
+}
+
 class AdaptiveReviewDecision {
   final LearningItem item;
   final int intervalDays;
@@ -20,6 +36,7 @@ class PronunciationAssessment {
   final int score;
   final List<String> missingWords;
   final String naturalSuggestion;
+  final List<SpeakingTokenFeedback> wordFeedback;
 
   const PronunciationAssessment({
     required this.target,
@@ -29,6 +46,7 @@ class PronunciationAssessment {
     required this.score,
     required this.missingWords,
     required this.naturalSuggestion,
+    this.wordFeedback = const <SpeakingTokenFeedback>[],
   });
 
   bool get passed => score >= 75;
