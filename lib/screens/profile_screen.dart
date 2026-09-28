@@ -16,6 +16,7 @@ class ProfileScreen extends StatelessWidget {
   final VoidCallback? onOpenProgress;
   final VoidCallback? onOpenGrowth;
   final VoidCallback? onOpenAdaptive;
+  final VoidCallback? onOpenIntelligence;
   final VoidCallback? onOpenSpeaking;
   final VoidCallback? onOpenCourse;
   final VoidCallback? onOpenCloud;
@@ -35,6 +36,7 @@ class ProfileScreen extends StatelessWidget {
     this.onOpenProgress,
     this.onOpenGrowth,
     this.onOpenAdaptive,
+    this.onOpenIntelligence,
     this.onOpenSpeaking,
     this.onOpenCourse,
     this.onOpenCloud,
@@ -207,13 +209,30 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Card(
+            key: const ValueKey('intelligence-core-entry'),
+            child: ListTile(
+              onTap: onOpenIntelligence,
+              contentPadding: const EdgeInsets.all(18),
+              leading: const Icon(Icons.auto_awesome_motion_outlined),
+              title: const Text(
+                'LinguaMate Intelligence Core',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: const Text(
+                'V1.37–V1.46：雲端、長期記憶、Live Voice、RPG、30 天路線、遊戲化與 Next Best Action',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
             key: const ValueKey('speaking-progress-entry'),
             child: ListTile(
               onTap: onOpenSpeaking,
               contentPadding: const EdgeInsets.all(18),
               leading: const Icon(Icons.record_voice_over_outlined),
               title: const Text(
-                '口說教練 2.0',
+                '口說教練 3.0',
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
               subtitle: const Text(
