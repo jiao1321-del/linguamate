@@ -52,7 +52,8 @@ class AiChatService {
             body: jsonEncode({
               'message': normalized,
               'targetLanguage': targetLanguage,
-              'scenario': scenario,
+              'scenario': _scenarioContext(scenario).scenario,
+              'learnerMemory': _scenarioContext(scenario).learnerMemory,
               'history': history.takeLast(8).toList(),
             }),
           )
@@ -104,6 +105,35 @@ class AiChatService {
     }
 
     return reply;
+  }
+}
+
+({String scenario, String learnerMemory}) _scenarioContext(
+  String rawScenario,
+) {
+  const marker = '\n\nLearner memory:';
+  final markerIndex = rawScenario.indexOf(marker);
+  if (markerIndex < 0) {
+    return (
+      scenario: rawScenario.trim(),
+      learnerMemory: '',
+    );
+  }
+
+  return (
+    scenario: rawScenario.substring(0, markerIndex).trim(),
+    learnerMemory: rawScenario
+        .substring(markerIndex + marker.length)
+        .trim()
+        .substringSafe(0, 2000),
+  );
+}
+
+extension _SafeSubstring on String {
+  String substringSafe(int start, int end) {
+    if (isEmpty || start >= length) return '';
+    final safeEnd = end > length ? length : end;
+    return substring(start, safeEnd);
   }
 }
 
