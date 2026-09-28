@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'models/adaptive_learning.dart';
+import 'models/ai_chat_state.dart';
 import 'models/ai_coach_reply.dart';
 import 'models/daily_training.dart';
 import 'models/language_analysis.dart';
@@ -9,10 +10,13 @@ import 'models/learning_ability.dart';
 import 'models/learning_path.dart';
 import 'models/learning_progress.dart';
 import 'models/mistake_record.dart';
+import 'models/speaking_attempt.dart';
 import 'models/weakness_record.dart';
 import 'screens/adaptive_learning_screen.dart';
 import 'screens/ai_chat_screen.dart';
 import 'screens/backup_screen.dart';
+import 'screens/cloud_sync_screen.dart';
+import 'screens/course_plan_screen.dart';
 import 'screens/daily_training_screen.dart';
 import 'screens/growth_center_screen.dart';
 import 'screens/home_screen.dart';
@@ -21,9 +25,13 @@ import 'screens/profile_screen.dart';
 import 'screens/progress_center_screen.dart';
 import 'screens/review_screen.dart';
 import 'screens/saved_screen.dart';
+import 'screens/speaking_progress_screen.dart';
+import 'services/adaptive_course_generator.dart';
 import 'services/adaptive_learning_engine.dart';
 import 'services/ai_chat_service.dart';
 import 'services/ai_chat_store.dart';
+import 'services/cloud_sync_service.dart';
+import 'services/course_progress_store.dart';
 import 'services/daily_training_plan_builder.dart';
 import 'services/daily_training_store.dart';
 import 'services/daily_goal_store.dart';
@@ -34,6 +42,7 @@ import 'services/learning_path_planner.dart';
 import 'services/learning_progress_store.dart';
 import 'services/learning_store.dart';
 import 'services/mistake_store.dart';
+import 'services/speaking_history_store.dart';
 import 'services/weakness_classifier.dart';
 import 'services/weakness_store.dart';
 
@@ -77,6 +86,9 @@ class _MainShellState extends State<MainShell> {
   final _mistakeStore = const MistakeStore();
   final _learningAbilityStore = const LearningAbilityStore();
   final _learningProgressStore = const LearningProgressStore();
+  final _speakingHistoryStore = const SpeakingHistoryStore();
+  final _courseProgressStore = const CourseProgressStore();
+  final _cloudSyncService = const CloudSyncService();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
@@ -87,8 +99,11 @@ class _MainShellState extends State<MainShell> {
   List<MistakeRecord> _mistakes = const [];
   List<LearningAbilityRecord> _abilityRecords = const [];
   List<DailyTrainingSummary> _trainingHistory = const [];
+  List<SpeakingAttempt> _speakingHistory = const [];
+  Set<String> _completedCourseChapters = <String>{};
   DailyTrainingSummary? _dailyTrainingSummary;
   int _dailyGoal = DailyGoalStore.defaultGoal;
+  int _dataRevision = 0;
 
   @override
   void initState() {
@@ -100,6 +115,8 @@ class _MainShellState extends State<MainShell> {
     _loadLearningAbility();
     _loadLearningProgress();
     _loadDailyGoal();
+    _loadSpeakingHistory();
+    _loadCourseProgress();
   }
 
   Future<void> _loadSavedItems() async {
@@ -163,6 +180,19 @@ class _MainShellState extends State<MainShell> {
     if (!mounted) return;
     setState(() => _dailyGoal = goal);
   }
+
+  Future<void> _loadSpeakingHistory() async {
+    final attempts = await _speakingHistoryStore.load();
+    if (!mounted) return;
+    setState(() => _speakingHistory = attempts);
+  }
+
+  Future<void> _loadCourseProgress() async {
+    final completed = await _courseProgressStore.loadCompleted();
+    if (!mounted) return;
+    setState(() => _completedCourseChapters = completed);
+  }
+
 
   Future<void> _updateDailyGoal(int goal) async {
     await _dailyGoalStore.save(goal);
