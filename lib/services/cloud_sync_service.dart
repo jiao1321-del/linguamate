@@ -22,6 +22,7 @@ class CloudSyncService {
   static const _sessionKey = 'linguamate_cloud_session_v136';
   static const _autoSyncKey = 'linguamate_cloud_auto_sync_v137';
   static const _lastSyncKey = 'linguamate_cloud_last_sync_v137';
+  static const _localUpdatedKey = 'linguamate_local_updated_v137';
 
   const CloudSyncService();
 
@@ -33,6 +34,20 @@ class CloudSyncService {
   Future<void> setAutoSyncEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_autoSyncKey, enabled);
+  }
+
+  Future<DateTime?> loadLocalUpdatedAt() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_localUpdatedKey);
+    return raw == null ? null : DateTime.tryParse(raw);
+  }
+
+  Future<void> markLocalUpdated([DateTime? at]) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _localUpdatedKey,
+      (at ?? DateTime.now()).toUtc().toIso8601String(),
+    );
   }
 
   Future<DateTime?> loadLastSyncedAt() async {
