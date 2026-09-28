@@ -200,6 +200,28 @@ class _MainShellState extends State<MainShell> {
     setState(() => _dailyGoal = goal);
   }
 
+  String _speakingMemoryHint() {
+    if (_speakingHistory.isEmpty) return '';
+    final recent = _speakingHistory.take(7).toList(growable: false);
+    final average =
+        (recent.fold<int>(0, (sum, item) => sum + item.score) / recent.length)
+            .round();
+    final counts = <String, int>{};
+    for (final attempt in recent) {
+      for (final word in attempt.missingWords) {
+        final normalized = word.trim().toLowerCase();
+        if (normalized.isEmpty) continue;
+        counts[normalized] = (counts[normalized] ?? 0) + 1;
+      }
+    }
+    final ranked = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final missing = ranked.take(3).map((item) => item.key).join('、');
+    return missing.isEmpty
+        ? '最近口說平均 $average 分'
+        : '最近口說平均 $average 分；常漏字：$missing';
+  }
+
   LearningAbilityReport _buildAbilityReport() {
     return LearningAbilityAnalyzer.build(
       tracked: _abilityRecords,
@@ -890,7 +912,10 @@ class _MainShellState extends State<MainShell> {
         onWeaknessDetected: _recordChatWeakness,
         onLearningPackUpdated: _captureLearningPack,
         proactiveCoachMessage: adaptiveSnapshot.coachMessage,
-        learnerMemory: adaptiveSnapshot.memory.summary,
+        learnerMemory: [
+          adaptiveSnapshot.memory.summary,
+          _speakingMemoryHint(),
+        ].where((item) => item.trim().isNotEmpty).join('；'),
         onSpeakingResult: _recordSpeakingResult,
         onStartRecommendedTraining: () =>
             _handleAdaptiveAction(adaptiveSnapshot.recommendedAction),
