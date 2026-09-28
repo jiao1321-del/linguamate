@@ -53,6 +53,15 @@ class LearningProgressStore {
     return sorted;
   }
 
+  Future<void> replace(List<DailyTrainingSummary> items) async {
+    final prefs = await SharedPreferences.getInstance();
+    final sorted = _sorted(items.length <= 90 ? items : items.take(90).toList());
+    await prefs.setString(
+      _storageKey,
+      jsonEncode(sorted.map((item) => item.toJson()).toList()),
+    );
+  }
+
   Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
