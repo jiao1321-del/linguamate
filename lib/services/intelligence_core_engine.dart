@@ -58,7 +58,7 @@ class IntelligenceCoreEngine {
     required int campaignCompleted,
     required int courseCompleted,
   }) {
-    if (activeMistakes >= 3) {
+    if (activeMistakes > 0) {
       return NextBestAction(
         action: 'mistakes',
         title: '先收回高優先錯題',
