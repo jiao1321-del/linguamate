@@ -884,6 +884,7 @@ class _MainShellState extends State<MainShell> {
         onSaved: _openSavedItems,
       ),
       AiChatScreen(
+        key: ValueKey('ai-chat-$_dataRevision'),
         onSend: _aiChatService.send,
         onSaveLearning: _saveChatLearningItem,
         onWeaknessDetected: _recordChatWeakness,
@@ -911,6 +912,9 @@ class _MainShellState extends State<MainShell> {
         onOpenProgress: _openProgressCenter,
         onOpenGrowth: _openGrowthCenter,
         onOpenAdaptive: _openAdaptiveLearning,
+        onOpenSpeaking: _openSpeakingProgress,
+        onOpenCourse: _openCoursePlan,
+        onOpenCloud: _openCloudSync,
         onOpenBackup: _openBackup,
       ),
     ];
