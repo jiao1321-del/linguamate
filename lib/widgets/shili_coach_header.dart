@@ -143,13 +143,22 @@ class ShiliCoachHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '汐璃 Shili ✨',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '汐璃 Shili',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                    ),
                           ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Text('✨', style: TextStyle(fontSize: 13)),
+                      ],
                     ),
                     const SizedBox(height: 1),
                     Text(
