@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'models/adaptive_learning.dart';
@@ -209,7 +210,9 @@ class _MainShellState extends State<MainShell> {
             );
     });
 
-    unawaited(_showOnboardingIfNeeded());
+    if (kIsWeb) {
+      unawaited(_showOnboardingIfNeeded());
+    }
 
     if (_autoSyncEnabled && session != null) {
       await _autoSyncNow();
