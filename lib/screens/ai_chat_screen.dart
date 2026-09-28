@@ -343,7 +343,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ],
         ),
         actions: [
-          TextButton(
+          TextButton.icon(
+            key: const ValueKey('repeat-speaking-assessment'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              Future<void>.delayed(
+                const Duration(milliseconds: 250),
+                _startSpeakingAssessment,
+              );
+            },
+            icon: const Icon(Icons.replay_rounded),
+            label: const Text('再錄一次'),
+          ),
+          FilledButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('完成'),
           ),
@@ -389,6 +401,18 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   int get _missionUserTurns =>
       _activeMission == null ? 0 : _entries.where((entry) => entry.mine).length;
+
+  int get _missionNaturalnessScore {
+    if (_activeMission == null) return 0;
+    final replies = _entries
+        .where((entry) => !entry.mine && entry.reply != null)
+        .map((entry) => entry.reply!)
+        .toList(growable: false);
+    if (replies.isEmpty) return 100;
+    final corrections =
+        replies.where((reply) => reply.hasCorrection).length;
+    return (100 - corrections * 10).clamp(60, 100).toInt();
+  }
 
   AiChatMessage _missionWelcomeEntry(RoleplayMission mission) {
     return AiChatMessage(
@@ -1067,7 +1091,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   Expanded(
                     child: Text(
                       _missionUserTurns >= _activeMission!.completionTurns
-                          ? '✅ 任務已完成：${_activeMission!.title} · 可以打開學習包回顧'
+                          ? '✅ ${_activeMission!.title} 完成 · 表達自然度約 $_missionNaturalnessScore% · 可打開學習包回顧'
                           : '🎭 ${_activeMission!.title} · ${_activeMission!.stageForTurn(_missionUserTurns)} · $_missionUserTurns/${_activeMission!.completionTurns} 回合',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
