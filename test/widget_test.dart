@@ -46,6 +46,7 @@ class _FakeSpeechCoachService implements SpeechCoachService {
   Future<void> speak({
     required String text,
     required String languageTag,
+    double rate = 0.46,
   }) async {
     spoken.add('$languageTag:$text');
   }
@@ -767,6 +768,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AI 情境任務'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('roleplay-airport-checkin')),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(
       find.byKey(const ValueKey('roleplay-airport-checkin')),
     );

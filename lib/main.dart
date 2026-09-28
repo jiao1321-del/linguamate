@@ -1,8 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'models/adaptive_learning.dart';
 import 'models/ai_chat_state.dart';
 import 'models/ai_coach_reply.dart';
+import 'models/cloud_sync_status.dart';
+import 'models/gamification.dart';
+import 'models/intelligence_core.dart';
+import 'models/learner_memory_profile.dart';
+import 'models/learning_insights.dart';
 import 'models/daily_training.dart';
 import 'models/language_analysis.dart';
 import 'models/learning_item.dart';
@@ -10,7 +17,9 @@ import 'models/learning_ability.dart';
 import 'models/learning_path.dart';
 import 'models/learning_progress.dart';
 import 'models/mistake_record.dart';
+import 'models/roleplay_campaign.dart';
 import 'models/speaking_attempt.dart';
+import 'models/training_telemetry.dart';
 import 'models/weakness_record.dart';
 import 'screens/adaptive_learning_screen.dart';
 import 'screens/ai_chat_screen.dart';
@@ -18,31 +27,47 @@ import 'screens/backup_screen.dart';
 import 'screens/cloud_sync_screen.dart';
 import 'screens/course_plan_screen.dart';
 import 'screens/daily_training_screen.dart';
+import 'screens/gamification_screen.dart';
 import 'screens/growth_center_screen.dart';
+import 'screens/intelligence_hub_screen.dart';
+import 'screens/learner_memory_screen.dart';
+import 'screens/learning_insights_screen.dart';
+import 'screens/live_voice_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/progress_center_screen.dart';
 import 'screens/review_screen.dart';
+import 'screens/roadmap_30_screen.dart';
+import 'screens/roleplay_campaign_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/speaking_progress_screen.dart';
 import 'services/adaptive_course_generator.dart';
 import 'services/adaptive_learning_engine.dart';
 import 'services/ai_chat_service.dart';
 import 'services/ai_chat_store.dart';
+import 'services/cloud_payload_merger.dart';
 import 'services/cloud_sync_service.dart';
 import 'services/course_progress_store.dart';
 import 'services/daily_training_plan_builder.dart';
 import 'services/daily_training_store.dart';
 import 'services/daily_goal_store.dart';
+import 'services/gamification_engine.dart';
+import 'services/intelligence_core_engine.dart';
 import 'services/language_analysis_service.dart';
 import 'services/learning_ability_analyzer.dart';
 import 'services/learning_ability_store.dart';
+import 'services/learner_memory_engine.dart';
+import 'services/learner_memory_store.dart';
+import 'services/learning_insights_engine.dart';
 import 'services/learning_path_planner.dart';
 import 'services/learning_progress_store.dart';
 import 'services/learning_store.dart';
 import 'services/mistake_store.dart';
+import 'services/roadmap_30_store.dart';
+import 'services/roleplay_campaign_store.dart';
 import 'services/speaking_history_store.dart';
+import 'services/training_telemetry_store.dart';
 import 'services/weakness_classifier.dart';
 import 'services/weakness_store.dart';
 
@@ -89,6 +114,10 @@ class _MainShellState extends State<MainShell> {
   final _speakingHistoryStore = const SpeakingHistoryStore();
   final _courseProgressStore = const CourseProgressStore();
   final _cloudSyncService = const CloudSyncService();
+  final _learnerMemoryStore = const LearnerMemoryStore();
+  final _telemetryStore = const TrainingTelemetryStore();
+  final _campaignStore = const RoleplayCampaignStore();
+  final _roadmapStore = const Roadmap30Store();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
@@ -100,23 +129,85 @@ class _MainShellState extends State<MainShell> {
   List<LearningAbilityRecord> _abilityRecords = const [];
   List<DailyTrainingSummary> _trainingHistory = const [];
   List<SpeakingAttempt> _speakingHistory = const [];
+  List<TrainingTelemetry> _trainingTelemetry = const [];
+  LearnerMemoryProfile _learnerMemory = LearnerMemoryProfile.empty();
   Set<String> _completedCourseChapters = <String>{};
+  Set<String> _completedCampaignMissions = <String>{};
+  Set<String> _completedRoadmapDays = <String>{};
   DailyTrainingSummary? _dailyTrainingSummary;
   int _dailyGoal = DailyGoalStore.defaultGoal;
+  String _roadmapGoal = '日常英文';
+  String? _pendingMissionId;
   int _dataRevision = 0;
+  bool _autoSyncEnabled = true;
+  bool _syncInProgress = false;
+  DateTime _localUpdatedAt = DateTime.fromMillisecondsSinceEpoch(0);
+  CloudSyncStatus _cloudStatus = const CloudSyncStatus.signedOut();
+  Timer? _cloudSyncDebounce;
 
   @override
   void initState() {
     super.initState();
-    _loadSavedItems();
-    _loadWeaknesses();
-    _loadTrainingContext();
-    _loadMistakes();
-    _loadLearningAbility();
-    _loadLearningProgress();
-    _loadDailyGoal();
-    _loadSpeakingHistory();
-    _loadCourseProgress();
+    unawaited(_bootstrap());
+  }
+
+  @override
+  void dispose() {
+    _cloudSyncDebounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _bootstrap() async {
+    await Future.wait<void>([
+      _loadSavedItems(),
+      _loadWeaknesses(),
+      _loadTrainingContext(),
+      _loadMistakes(),
+      _loadLearningAbility(),
+      _loadLearningProgress(),
+      _loadDailyGoal(),
+      _loadSpeakingHistory(),
+      _loadCourseProgress(),
+      _loadTelemetry(),
+      _loadCampaignProgress(),
+      _loadRoadmapProgress(),
+      _loadLearnerMemory(),
+    ]);
+    if (!mounted) return;
+
+    final storedLocalUpdated =
+        await _cloudSyncService.loadLocalUpdatedAt();
+    final hasLocalData = _savedItems.isNotEmpty ||
+        _weaknesses.isNotEmpty ||
+        _mistakes.isNotEmpty ||
+        _abilityRecords.isNotEmpty ||
+        _trainingHistory.isNotEmpty ||
+        _speakingHistory.isNotEmpty;
+    _localUpdatedAt = storedLocalUpdated ??
+        (hasLocalData
+            ? DateTime.now()
+            : DateTime.fromMillisecondsSinceEpoch(0));
+    if (storedLocalUpdated == null && hasLocalData) {
+      await _cloudSyncService.markLocalUpdated(_localUpdatedAt);
+    }
+
+    await _refreshLearnerMemory();
+    _autoSyncEnabled = await _cloudSyncService.loadAutoSyncEnabled();
+    final lastSync = await _cloudSyncService.loadLastSyncedAt();
+    final session = await _cloudSyncService.loadSession();
+    if (!mounted) return;
+    setState(() {
+      _cloudStatus = session == null
+          ? const CloudSyncStatus.signedOut()
+          : CloudSyncStatus(
+              phase: CloudSyncPhase.idle,
+              lastSyncedAt: lastSync,
+              email: session.email,
+            );
+    });
+    if (_autoSyncEnabled && session != null) {
+      await _autoSyncNow();
+    }
   }
 
   Future<void> _loadSavedItems() async {
@@ -194,10 +285,139 @@ class _MainShellState extends State<MainShell> {
   }
 
 
+  Future<void> _loadTelemetry() async {
+    final items = await _telemetryStore.load();
+    if (!mounted) return;
+    setState(() => _trainingTelemetry = items);
+  }
+
+  Future<void> _loadCampaignProgress() async {
+    final completed = await _campaignStore.loadCompleted();
+    if (!mounted) return;
+    setState(() => _completedCampaignMissions = completed);
+  }
+
+  Future<void> _loadRoadmapProgress() async {
+    final results = await Future.wait<Object>([
+      _roadmapStore.loadGoal(),
+      _roadmapStore.loadCompleted(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _roadmapGoal = results[0] as String;
+      _completedRoadmapDays = results[1] as Set<String>;
+    });
+  }
+
+  Future<void> _loadLearnerMemory() async {
+    final profile = await _learnerMemoryStore.load();
+    if (!mounted) return;
+    setState(() => _learnerMemory = profile);
+  }
+
+  Future<void> _refreshLearnerMemory() async {
+    final chatState = await _aiChatStore.load();
+    final profile = LearnerMemoryEngine.build(
+      abilities: _abilityRecords,
+      weaknesses: _weaknesses,
+      mistakes: _mistakes,
+      speaking: _speakingHistory,
+      savedItems: _savedItems,
+      chatState: chatState,
+    );
+    await _learnerMemoryStore.save(profile);
+    if (!mounted) return;
+    setState(() => _learnerMemory = profile);
+  }
+
+  void _markLocalChanged({bool refreshMemory = true}) {
+    _localUpdatedAt = DateTime.now();
+    unawaited(_cloudSyncService.markLocalUpdated(_localUpdatedAt));
+    if (refreshMemory) {
+      unawaited(_refreshLearnerMemory());
+    }
+    _scheduleAutoSync();
+  }
+
+  void _scheduleAutoSync() {
+    if (!_autoSyncEnabled || _syncInProgress) return;
+    _cloudSyncDebounce?.cancel();
+    _cloudSyncDebounce = Timer(
+      const Duration(seconds: 2),
+      () => unawaited(_autoSyncNow()),
+    );
+  }
+
+  Future<void> _setAutoSyncEnabled(bool enabled) async {
+    await _cloudSyncService.setAutoSyncEnabled(enabled);
+    if (!mounted) return;
+    setState(() => _autoSyncEnabled = enabled);
+    if (enabled) {
+      await _autoSyncNow();
+    }
+  }
+
+  Future<void> _autoSyncNow() async {
+    if (_syncInProgress) return;
+    final session = await _cloudSyncService.loadSession();
+    if (session == null) {
+      if (mounted) {
+        setState(() => _cloudStatus = const CloudSyncStatus.signedOut());
+      }
+      return;
+    }
+
+    _syncInProgress = true;
+    if (mounted) {
+      setState(() {
+        _cloudStatus = CloudSyncStatus(
+          phase: CloudSyncPhase.syncing,
+          lastSyncedAt: _cloudStatus.lastSyncedAt,
+          email: session.email,
+        );
+      });
+    }
+
+    try {
+      final local = await _exportCloudPayload();
+      final cloud = await _cloudSyncService.download(session);
+      final merged = CloudPayloadMerger.merge(local, cloud);
+      await _importCloudPayload(merged, fromSync: true);
+      await _cloudSyncService.upload(session: session, payload: merged);
+      final syncedAt = DateTime.now();
+      if (!mounted) return;
+      setState(() {
+        _cloudStatus = CloudSyncStatus(
+          phase: CloudSyncPhase.synced,
+          lastSyncedAt: syncedAt,
+          email: session.email,
+        );
+      });
+    } catch (error) {
+      if (!mounted) return;
+      final text = error.toString().toLowerCase();
+      final offline = text.contains('network') ||
+          text.contains('host') ||
+          text.contains('socket') ||
+          text.contains('connection');
+      setState(() {
+        _cloudStatus = CloudSyncStatus(
+          phase: offline ? CloudSyncPhase.offline : CloudSyncPhase.error,
+          lastSyncedAt: _cloudStatus.lastSyncedAt,
+          message: error.toString(),
+          email: session.email,
+        );
+      });
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
   Future<void> _updateDailyGoal(int goal) async {
     await _dailyGoalStore.save(goal);
     if (!mounted) return;
     setState(() => _dailyGoal = goal);
+    _markLocalChanged(refreshMemory: false);
   }
 
   String _speakingMemoryHint() {
@@ -289,6 +509,7 @@ class _MainShellState extends State<MainShell> {
           ? updated
           : updated.sublist(updated.length - 20);
     });
+    _markLocalChanged();
   }
 
   DailyTrainingPlan _buildDailyTrainingPlan() {
@@ -320,6 +541,7 @@ class _MainShellState extends State<MainShell> {
       _mistakes = mistakes;
       _abilityRecords = abilities;
     });
+    _markLocalChanged();
   }
 
   Future<void> _recordSpeakingResult(
@@ -348,6 +570,14 @@ class _MainShellState extends State<MainShell> {
       _speakingHistory =
           results[1] as List<SpeakingAttempt>;
     });
+    _markLocalChanged();
+  }
+
+  Future<void> _recordTelemetry(TrainingTelemetry telemetry) async {
+    final updated = await _telemetryStore.append(telemetry);
+    if (!mounted) return;
+    setState(() => _trainingTelemetry = updated);
+    _markLocalChanged(refreshMemory: false);
   }
 
   Future<void> _startMistakeTraining() async {
@@ -366,6 +596,7 @@ class _MainShellState extends State<MainShell> {
           plan: plan,
           onReviewResult: _recordReviewResult,
           onTaskResult: _recordTrainingResult,
+          onTelemetry: _recordTelemetry,
           onCompleted: (_) async {},
         ),
       ),
@@ -382,6 +613,7 @@ class _MainShellState extends State<MainShell> {
       _dailyTrainingSummary = summary;
       _trainingHistory = history;
     });
+    _markLocalChanged();
   }
 
   Future<void> _startDailyTraining() async {
@@ -403,6 +635,7 @@ class _MainShellState extends State<MainShell> {
           plan: plan,
           onReviewResult: _recordReviewResult,
           onTaskResult: _recordTrainingResult,
+          onTelemetry: _recordTelemetry,
           onCompleted: _completeDailyTraining,
         ),
       ),
@@ -437,6 +670,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _savedItems = updatedItems;
     });
+    _markLocalChanged();
     return true;
   }
 
@@ -472,6 +706,7 @@ class _MainShellState extends State<MainShell> {
       _weaknesses = records;
       _isLoadingWeaknesses = false;
     });
+    _markLocalChanged();
   }
 
   Future<void> _deleteLearningItem(String id) async {
@@ -484,6 +719,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _savedItems = updatedItems;
     });
+    _markLocalChanged();
   }
 
   Future<void> _updateLearningItemCategory(
@@ -504,6 +740,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _savedItems = updatedItems;
     });
+    _markLocalChanged();
   }
 
   Future<void> _restoreLearningItems(List<LearningItem> items) async {
@@ -513,6 +750,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _savedItems = items;
     });
+    _markLocalChanged();
   }
 
   Future<void> _openProgressCenter() async {
@@ -553,6 +791,7 @@ class _MainShellState extends State<MainShell> {
       mistakes: _mistakes,
       weaknesses: _weaknesses,
       dailyGoal: _dailyGoal,
+      telemetry: _trainingTelemetry,
     );
 
     await Navigator.of(context).push(
@@ -575,10 +814,209 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
+  Future<void> _openLearnerMemory() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => LearnerMemoryScreen(
+          profile: _learnerMemory,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLiveVoice() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => LiveVoiceScreen(
+          onSend: _aiChatService.send,
+          learnerMemory: _learnerMemory.summary,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _completeCampaignMission(String missionId) async {
+    final completed = await _campaignStore.complete(missionId);
+    if (!mounted) return;
+    setState(() {
+      _completedCampaignMissions = completed;
+      if (_pendingMissionId == missionId) {
+        _pendingMissionId = null;
+      }
+    });
+    _markLocalChanged(refreshMemory: false);
+  }
+
+  void _launchCampaignMission(String missionId) {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    setState(() {
+      _pendingMissionId = missionId;
+      _index = 2;
+      _dataRevision++;
+    });
+  }
+
+  Future<void> _openRoleplayCampaign() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => RoleplayCampaignScreen(
+          campaign: RoleplayCampaign.overseasWork,
+          completedMissionIds: _completedCampaignMissions,
+          onStartMission: _launchCampaignMission,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setRoadmapGoal(String goal) async {
+    await _roadmapStore.saveGoal(goal);
+    if (!mounted) return;
+    setState(() => _roadmapGoal = goal);
+    _markLocalChanged(refreshMemory: false);
+  }
+
+  Future<Set<String>> _completeRoadmapDay(
+    String goal,
+    int day,
+  ) async {
+    final completed = await _roadmapStore.complete(
+      goal: goal,
+      day: day,
+    );
+    if (mounted) {
+      setState(() => _completedRoadmapDays = completed);
+      _markLocalChanged(refreshMemory: false);
+    }
+    return completed;
+  }
+
+  Future<void> _openRoadmap30() async {
+    final abilityReport = _buildAbilityReport();
+    final priority = abilityReport.priorityLabel ?? '自然表達';
+    final weakness = _weaknesses.isEmpty
+        ? priority
+        : _weaknesses.first.category;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Roadmap30Screen(
+          initialGoal: _roadmapGoal,
+          initialCompleted: _completedRoadmapDays,
+          priority: priority,
+          weakness: weakness,
+          onGoalChanged: _setRoadmapGoal,
+          onComplete: _completeRoadmapDay,
+          onAction: _handleAdaptiveAction,
+        ),
+      ),
+    );
+  }
+
+  GamificationSnapshot _buildGamification(
+    LearningProgressReport progressReport,
+  ) {
+    return GamificationEngine.build(
+      progress: progressReport,
+      speaking: _speakingHistory,
+      dailyGoal: _dailyGoal,
+      courseCompleted: _completedCourseChapters,
+      campaignCompleted: _completedCampaignMissions,
+      roadmapCompleted: _completedRoadmapDays,
+    );
+  }
+
+  LearningInsightsSnapshot _buildInsights(
+    LearningProgressReport progressReport,
+  ) {
+    return LearningInsightsEngine.build(
+      progress: progressReport,
+      abilities: _abilityRecords,
+      mistakes: _mistakes,
+      speaking: _speakingHistory,
+      telemetry: _trainingTelemetry,
+    );
+  }
+
+  Future<void> _openGamification() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => GamificationScreen(
+          snapshot: _buildGamification(progressReport),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openInsights() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => LearningInsightsScreen(
+          snapshot: _buildInsights(progressReport),
+        ),
+      ),
+    );
+  }
+
+  IntelligenceCoreSnapshot _buildIntelligence(
+    LearningProgressReport progressReport,
+    AdaptiveLearningSnapshot adaptiveSnapshot,
+  ) {
+    return IntelligenceCoreEngine.build(
+      memory: _learnerMemory,
+      insights: _buildInsights(progressReport),
+      gamification: _buildGamification(progressReport),
+      learningItems: _savedItems,
+      mistakes: _mistakes,
+      adaptiveDifficulty: adaptiveSnapshot.difficulty,
+      roadmapCompleted: _completedRoadmapDays,
+      campaignCompleted: _completedCampaignMissions,
+      courseCompleted: _completedCourseChapters,
+    );
+  }
+
+  Future<void> _openIntelligenceHub() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    final adaptiveSnapshot = AdaptiveLearningEngine.buildSnapshot(
+      learningItems: _savedItems,
+      abilityReport: abilityReport,
+      progressReport: progressReport,
+      mistakes: _mistakes,
+      weaknesses: _weaknesses,
+      dailyGoal: _dailyGoal,
+      telemetry: _trainingTelemetry,
+    );
+    final snapshot = _buildIntelligence(
+      progressReport,
+      adaptiveSnapshot,
+    );
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => IntelligenceHubScreen(
+          snapshot: snapshot,
+          onAction: _handleAdaptiveAction,
+          onOpenCloud: _openCloudSync,
+          onOpenMemory: _openLearnerMemory,
+          onOpenSpeaking: _openSpeakingProgress,
+          onOpenLiveVoice: _openLiveVoice,
+          onOpenCampaign: _openRoleplayCampaign,
+          onOpenRoadmap: _openRoadmap30,
+          onOpenGamification: _openGamification,
+          onOpenInsights: _openInsights,
+        ),
+      ),
+    );
+  }
+
   Future<Set<String>> _completeCourseChapter(String chapterId) async {
     final completed = await _courseProgressStore.complete(chapterId);
     if (mounted) {
       setState(() => _completedCourseChapters = completed);
+      _markLocalChanged(refreshMemory: false);
     }
     return completed;
   }
@@ -622,7 +1060,7 @@ class _MainShellState extends State<MainShell> {
   Future<Map<String, dynamic>> _exportCloudPayload() async {
     final chatState = await _aiChatStore.load();
     return {
-      'schemaVersion': 136,
+      'schemaVersion': 146,
       'savedItems': _savedItems.map((item) => item.toJson()).toList(),
       'weaknesses': _weaknesses.map((item) => item.toJson()).toList(),
       'mistakes': _mistakes.map((item) => item.toJson()).toList(),
@@ -633,12 +1071,21 @@ class _MainShellState extends State<MainShell> {
       'speakingHistory':
           _speakingHistory.map((item) => item.toJson()).toList(),
       'courseCompleted': _completedCourseChapters.toList(),
+      'campaignCompleted': _completedCampaignMissions.toList(),
+      'roadmapCompleted': _completedRoadmapDays.toList(),
+      'roadmapGoal': _roadmapGoal,
+      'trainingTelemetry':
+          _trainingTelemetry.map((item) => item.toJson()).toList(),
+      'learnerMemory': _learnerMemory.toJson(),
       'chatState': chatState?.toJson(),
-      'syncedAt': DateTime.now().toUtc().toIso8601String(),
+      'syncedAt': _localUpdatedAt.toUtc().toIso8601String(),
     };
   }
 
-  Future<void> _importCloudPayload(Map<String, dynamic> payload) async {
+  Future<void> _importCloudPayload(
+    Map<String, dynamic> payload, {
+    bool fromSync = false,
+  }) async {
     final items = _decodeCloudList<LearningItem>(
       payload['savedItems'],
       LearningItem.fromJson,
@@ -663,6 +1110,26 @@ class _MainShellState extends State<MainShell> {
       payload['speakingHistory'],
       SpeakingAttempt.fromJson,
     );
+    final telemetry = _decodeCloudList<TrainingTelemetry>(
+      payload['trainingTelemetry'],
+      TrainingTelemetry.fromJson,
+    );
+    final campaignRaw = payload['campaignCompleted'];
+    final campaignCompleted = campaignRaw is List
+        ? campaignRaw.whereType<String>().toSet()
+        : <String>{};
+    final roadmapRaw = payload['roadmapCompleted'];
+    final roadmapCompleted = roadmapRaw is List
+        ? roadmapRaw.whereType<String>().toSet()
+        : <String>{};
+    final roadmapGoal =
+        (payload['roadmapGoal'] as String? ?? '日常英文').trim();
+    final rawMemory = payload['learnerMemory'];
+    final learnerMemory = rawMemory is Map
+        ? LearnerMemoryProfile.fromJson(
+            Map<String, dynamic>.from(rawMemory),
+          )
+        : LearnerMemoryProfile.empty();
     final completedRaw = payload['courseCompleted'];
     final completed = completedRaw is List
         ? completedRaw.whereType<String>().toSet()
@@ -682,6 +1149,11 @@ class _MainShellState extends State<MainShell> {
     await _dailyGoalStore.save(goal);
     await _speakingHistoryStore.replace(speaking);
     await _courseProgressStore.replace(completed);
+    await _telemetryStore.replace(telemetry);
+    await _campaignStore.replace(campaignCompleted);
+    await _roadmapStore.replace(roadmapCompleted);
+    await _roadmapStore.saveGoal(roadmapGoal);
+    await _learnerMemoryStore.save(learnerMemory);
 
     if (chatState == null) {
       await _aiChatStore.clear();
@@ -713,12 +1185,25 @@ class _MainShellState extends State<MainShell> {
           ? goal
           : DailyGoalStore.defaultGoal;
       _speakingHistory = speaking;
+      _trainingTelemetry = telemetry;
       _completedCourseChapters = completed;
+      _completedCampaignMissions = campaignCompleted;
+      _completedRoadmapDays = roadmapCompleted;
+      _roadmapGoal = roadmapGoal.isEmpty ? '日常英文' : roadmapGoal;
+      _learnerMemory = learnerMemory;
       _coachReplies = replies;
       _isLoadingSavedItems = false;
       _isLoadingWeaknesses = false;
       _dataRevision++;
     });
+    final syncedAt =
+        DateTime.tryParse(payload['syncedAt'] as String? ?? '');
+    if (syncedAt != null && syncedAt.isAfter(_localUpdatedAt)) {
+      _localUpdatedAt = syncedAt.toLocal();
+    }
+    if (!fromSync) {
+      _markLocalChanged(refreshMemory: false);
+    }
   }
 
   Future<void> _openCloudSync() async {
@@ -728,6 +1213,10 @@ class _MainShellState extends State<MainShell> {
           service: _cloudSyncService,
           exportLocal: _exportCloudPayload,
           importCloud: _importCloudPayload,
+          status: _cloudStatus,
+          autoSyncEnabled: _autoSyncEnabled,
+          onAutoSyncChanged: _setAutoSyncEnabled,
+          onSyncNow: _autoSyncNow,
         ),
       ),
     );
@@ -756,6 +1245,22 @@ class _MainShellState extends State<MainShell> {
             content: Text('已切到 Shili，點上方 🎭 選擇情境任務。'),
           ),
         );
+        break;
+      case 'liveVoice':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openLiveVoice();
+        break;
+      case 'roadmap':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openRoadmap30();
+        break;
+      case 'campaign':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openRoleplayCampaign();
+        break;
+      case 'course':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openCoursePlan();
         break;
       case 'ai':
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -824,6 +1329,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _savedItems = updatedItems;
     });
+    _markLocalChanged();
   }
 
   void _openPage(int index) {
@@ -881,6 +1387,11 @@ class _MainShellState extends State<MainShell> {
       mistakes: _mistakes,
       weaknesses: _weaknesses,
       dailyGoal: _dailyGoal,
+      telemetry: _trainingTelemetry,
+    );
+    final intelligenceSnapshot = _buildIntelligence(
+      progressReport,
+      adaptiveSnapshot,
     );
     final dailyPlan = _buildDailyTrainingPlan();
     final dailyCompleted =
@@ -911,14 +1422,18 @@ class _MainShellState extends State<MainShell> {
         onSaveLearning: _saveChatLearningItem,
         onWeaknessDetected: _recordChatWeakness,
         onLearningPackUpdated: _captureLearningPack,
-        proactiveCoachMessage: adaptiveSnapshot.coachMessage,
+        proactiveCoachMessage: intelligenceSnapshot.coachMessage,
         learnerMemory: [
+          _learnerMemory.summary,
           adaptiveSnapshot.memory.summary,
           _speakingMemoryHint(),
         ].where((item) => item.trim().isNotEmpty).join('；'),
         onSpeakingResult: _recordSpeakingResult,
-        onStartRecommendedTraining: () =>
-            _handleAdaptiveAction(adaptiveSnapshot.recommendedAction),
+        onStartRecommendedTraining: () => _handleAdaptiveAction(
+          intelligenceSnapshot.nextBestAction.action,
+        ),
+        initialMissionId: _pendingMissionId,
+        onMissionCompleted: _completeCampaignMission,
       ),
       SavedScreen(
         items: _savedItems,
@@ -937,6 +1452,7 @@ class _MainShellState extends State<MainShell> {
         onOpenProgress: _openProgressCenter,
         onOpenGrowth: _openGrowthCenter,
         onOpenAdaptive: _openAdaptiveLearning,
+        onOpenIntelligence: _openIntelligenceHub,
         onOpenSpeaking: _openSpeakingProgress,
         onOpenCourse: _openCoursePlan,
         onOpenCloud: _openCloudSync,

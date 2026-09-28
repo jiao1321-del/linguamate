@@ -5,6 +5,7 @@ import '../models/learning_ability.dart';
 import '../models/learning_item.dart';
 import '../models/learning_progress.dart';
 import '../models/mistake_record.dart';
+import '../models/training_telemetry.dart';
 import '../models/weakness_record.dart';
 import 'daily_training_plan_builder.dart';
 
@@ -18,6 +19,7 @@ class AdaptiveLearningEngine {
     required List<MistakeRecord> mistakes,
     required List<WeaknessRecord> weaknesses,
     required int dailyGoal,
+    List<TrainingTelemetry> telemetry = const <TrainingTelemetry>[],
     DateTime? now,
   }) {
     final reference = now ?? DateTime.now();
@@ -45,6 +47,7 @@ class AdaptiveLearningEngine {
       tasks: progressReport.totalTasks,
       accuracy: progressReport.overallAccuracy,
       mastered: abilityReport.masteredCount,
+      telemetry: telemetry,
     );
 
     final mastered = abilityReport.records
@@ -244,6 +247,13 @@ class AdaptiveLearningEngine {
         score: 0,
         missingWords: targetTokens,
         naturalSuggestion: target,
+        wordFeedback: [
+          for (final word in targetTokens)
+            SpeakingTokenFeedback(
+              word: word,
+              status: SpeakingTokenStatus.missing,
+            ),
+        ],
       );
     }
 
@@ -289,7 +299,79 @@ class AdaptiveLearningEngine {
       score: score,
       missingWords: missing.take(6).toList(growable: false),
       naturalSuggestion: target,
+      wordFeedback: _alignSpeakingWords(targetTokens, spokenTokens),
     );
+  }
+
+  static List<SpeakingTokenFeedback> _alignSpeakingWords(
+    List<String> target,
+    List<String> spoken,
+  ) {
+    final rows = target.length + 1;
+    final cols = spoken.length + 1;
+    final dp = List.generate(
+      rows,
+      (_) => List<int>.filled(cols, 0),
+    );
+
+    for (var i = target.length - 1; i >= 0; i--) {
+      for (var j = spoken.length - 1; j >= 0; j--) {
+        dp[i][j] = target[i] == spoken[j]
+            ? dp[i + 1][j + 1] + 1
+            : (dp[i + 1][j] >= dp[i][j + 1]
+                ? dp[i + 1][j]
+                : dp[i][j + 1]);
+      }
+    }
+
+    final result = <SpeakingTokenFeedback>[];
+    var i = 0;
+    var j = 0;
+    while (i < target.length && j < spoken.length) {
+      if (target[i] == spoken[j]) {
+        result.add(
+          SpeakingTokenFeedback(
+            word: target[i],
+            status: SpeakingTokenStatus.correct,
+          ),
+        );
+        i++;
+        j++;
+      } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+        result.add(
+          SpeakingTokenFeedback(
+            word: target[i],
+            status: SpeakingTokenStatus.missing,
+          ),
+        );
+        i++;
+      } else {
+        result.add(
+          SpeakingTokenFeedback(
+            word: spoken[j],
+            status: SpeakingTokenStatus.extra,
+          ),
+        );
+        j++;
+      }
+    }
+    while (i < target.length) {
+      result.add(
+        SpeakingTokenFeedback(
+          word: target[i++],
+          status: SpeakingTokenStatus.missing,
+        ),
+      );
+    }
+    while (j < spoken.length) {
+      result.add(
+        SpeakingTokenFeedback(
+          word: spoken[j++],
+          status: SpeakingTokenStatus.extra,
+        ),
+      );
+    }
+    return result;
   }
 
   static List<String> _tokens(String text) => text
@@ -315,13 +397,40 @@ class AdaptiveLearningEngine {
     required int tasks,
     required int accuracy,
     required int mastered,
+    required List<TrainingTelemetry> telemetry,
   }) {
-    var value = 1;
+    var value = 2;
     if (tasks >= 20) value++;
-    if (tasks >= 80 && accuracy >= 65) value++;
-    if (tasks >= 160 && accuracy >= 75) value++;
-    if (mastered >= 4 && accuracy >= 82) value++;
-    return value.clamp(1, 5).toInt();
+    if (tasks >= 60 && accuracy >= 60) value++;
+    if (tasks >= 100 && accuracy >= 70) value++;
+    if (tasks >= 180 && accuracy >= 78) value++;
+    if (mastered >= 3) value++;
+    if (mastered >= 6) value++;
+
+    final recent = telemetry.take(30).toList(growable: false);
+    if (recent.isNotEmpty) {
+      final correct =
+          recent.where((item) => item.correct).length / recent.length;
+      final hinted =
+          recent.where((item) => item.usedHint).length / recent.length;
+      final avgMs = recent.fold<int>(
+            0,
+            (sum, item) => sum + item.responseMs,
+          ) /
+          recent.length;
+
+      if (correct >= 0.85 && hinted <= 0.15 && avgMs <= 9000) {
+        value += 2;
+      } else if (correct >= 0.75 && hinted <= 0.25) {
+        value++;
+      }
+      if (correct < 0.55 || hinted >= 0.45) {
+        value -= 2;
+      } else if (avgMs >= 20000) {
+        value--;
+      }
+    }
+    return value.clamp(1, 10).toInt();
   }
 
   static String _coachMessage({

@@ -1,18 +1,27 @@
 import 'package:flutter/material.dart';
 
 import '../models/cloud_session.dart';
+import '../models/cloud_sync_status.dart';
 import '../services/cloud_sync_service.dart';
 
 class CloudSyncScreen extends StatefulWidget {
   final CloudSyncService service;
   final Future<Map<String, dynamic>> Function() exportLocal;
   final Future<void> Function(Map<String, dynamic> payload) importCloud;
+  final CloudSyncStatus status;
+  final bool autoSyncEnabled;
+  final Future<void> Function(bool enabled) onAutoSyncChanged;
+  final Future<void> Function() onSyncNow;
 
   const CloudSyncScreen({
     super.key,
     required this.service,
     required this.exportLocal,
     required this.importCloud,
+    this.status = const CloudSyncStatus.signedOut(),
+    this.autoSyncEnabled = true,
+    required this.onAutoSyncChanged,
+    required this.onSyncNow,
   });
 
   @override
@@ -25,11 +34,13 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
   CloudSession? _session;
   bool _loading = true;
   bool _busy = false;
+  late bool _autoSyncEnabled;
   String? _message;
 
   @override
   void initState() {
     super.initState();
+    _autoSyncEnabled = widget.autoSyncEnabled;
     _restore();
   }
 
@@ -73,8 +84,11 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
         if (!mounted) return;
         setState(() {
           _session = session;
-          _message = '登入成功。';
+          _message = '登入成功，正在同步…';
         });
+        await widget.onSyncNow();
+        if (!mounted) return;
+        setState(() => _message = '登入成功，已完成第一次合併同步 ☁️');
       });
 
   Future<void> _signUp() => _run(() async {
@@ -87,8 +101,13 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
           _session = session;
           _message = session == null
               ? '帳號已建立。若專案啟用 Email 驗證，請先完成信箱驗證後再登入。'
-              : '帳號已建立並登入。';
+              : '帳號已建立並登入，正在同步…';
         });
+        if (session != null) {
+          await widget.onSyncNow();
+          if (!mounted) return;
+          setState(() => _message = '帳號已建立並完成第一次合併同步 ☁️');
+        }
       });
 
   Future<void> _upload() => _run(() async {
@@ -113,6 +132,21 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
         if (!mounted) return;
         setState(() => _message = '雲端資料已還原到這台裝置。');
       });
+
+  Future<void> _syncNow() => _run(() async {
+        await widget.onSyncNow();
+        if (!mounted) return;
+        setState(() => _message = '已完成雙向合併同步 ☁️');
+      });
+
+  Future<void> _toggleAutoSync(bool enabled) async {
+    setState(() => _autoSyncEnabled = enabled);
+    await widget.onAutoSyncChanged(enabled);
+    if (!mounted) return;
+    setState(() {
+      _message = enabled ? '已開啟自動同步。' : '已關閉自動同步。';
+    });
+  }
 
   Future<void> _signOut() => _run(() async {
         await widget.service.signOut();
@@ -140,7 +174,7 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'V1.36 · LinguaMate Cloud',
+                          'V1.37 · Cloud Sync 2.0',
                           style: TextStyle(fontWeight: FontWeight.w900),
                         ),
                         const SizedBox(height: 8),
@@ -187,20 +221,63 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
                             ],
                           ),
                         ] else ...[
-                          FilledButton.tonalIcon(
-                            key: const ValueKey('cloud-upload'),
-                            onPressed: _busy ? null : _upload,
-                            icon: const Icon(Icons.cloud_upload_outlined),
-                            label: const Text('上傳目前學習資料'),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF4EEFF),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.cloud_done_outlined),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    widget.status.lastSyncedAt == null
+                                        ? widget.status.label
+                                        : '${widget.status.label} · ${widget.status.lastSyncedAt!.toLocal()}',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SwitchListTile(
+                            key: const ValueKey('cloud-auto-sync-toggle'),
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('自動同步'),
+                            subtitle: const Text(
+                              'App 啟動與學習資料變更後自動雙向合併',
+                            ),
+                            value: _autoSyncEnabled,
+                            onChanged: _busy ? null : _toggleAutoSync,
+                          ),
+                          FilledButton.icon(
+                            key: const ValueKey('cloud-sync-now'),
+                            onPressed: _busy ? null : _syncNow,
+                            icon: const Icon(Icons.sync_rounded),
+                            label: const Text('現在合併同步'),
                           ),
                           const SizedBox(height: 8),
-                          FilledButton.tonalIcon(
-                            key: const ValueKey('cloud-download'),
-                            onPressed: _busy ? null : _download,
-                            icon: const Icon(Icons.cloud_download_outlined),
-                            label: const Text('從雲端還原到此裝置'),
+                          ExpansionTile(
+                            tilePadding: EdgeInsets.zero,
+                            title: const Text('進階同步操作'),
+                            children: [
+                              FilledButton.tonalIcon(
+                                key: const ValueKey('cloud-upload'),
+                                onPressed: _busy ? null : _upload,
+                                icon: const Icon(Icons.cloud_upload_outlined),
+                                label: const Text('強制上傳本機資料'),
+                              ),
+                              const SizedBox(height: 8),
+                              FilledButton.tonalIcon(
+                                key: const ValueKey('cloud-download'),
+                                onPressed: _busy ? null : _download,
+                                icon: const Icon(Icons.cloud_download_outlined),
+                                label: const Text('從雲端還原到此裝置'),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 8),
                           TextButton.icon(
                             onPressed: _busy ? null : _signOut,
                             icon: const Icon(Icons.logout_rounded),
@@ -224,7 +301,7 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
                   child: Padding(
                     padding: EdgeInsets.all(16),
                     child: Text(
-                      '雲端資料受 Supabase Row Level Security 保護：每個帳號只能讀寫自己的同步資料。下載會以雲端資料取代此裝置的對應學習紀錄。',
+                      '雲端資料受 Supabase Row Level Security 保護。自動同步會依 ID 與時間戳合併收藏、錯題、能力、口說、課程、RPG 與 30 天路線；離線時保留本機資料，恢復連線後再同步。',
                     ),
                   ),
                 ),

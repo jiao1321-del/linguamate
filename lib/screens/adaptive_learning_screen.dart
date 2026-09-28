@@ -150,14 +150,14 @@ class AdaptiveLearningScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    '個人難度：Lv.${snapshot.difficulty} · ${snapshot.difficultyLabel}',
+                    '個人難度：Lv.${snapshot.difficulty}/10 · ${snapshot.difficultyLabel}',
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 8),
                   Text(snapshot.dailyPlanReason),
                   const SizedBox(height: 10),
                   LinearProgressIndicator(
-                    value: snapshot.difficulty / 5,
+                    value: snapshot.difficulty / 10,
                     minHeight: 8,
                     borderRadius: BorderRadius.circular(99),
                   ),

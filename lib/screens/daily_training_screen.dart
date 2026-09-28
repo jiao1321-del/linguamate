@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/daily_training.dart';
+import '../models/training_telemetry.dart';
 
 typedef DailyReviewRecorder = Future<void> Function(
   String learningItemId,
@@ -13,12 +14,16 @@ typedef DailyTaskResultRecorder = Future<void> Function(
   DailyTrainingTask task,
   bool correct,
 );
+typedef DailyTelemetryRecorder = Future<void> Function(
+  TrainingTelemetry telemetry,
+);
 
 class DailyTrainingScreen extends StatefulWidget {
   final DailyTrainingPlan plan;
   final DailyReviewRecorder onReviewResult;
   final DailyTrainingCompletion onCompleted;
   final DailyTaskResultRecorder? onTaskResult;
+  final DailyTelemetryRecorder? onTelemetry;
   final String title;
 
   const DailyTrainingScreen({
@@ -27,6 +32,7 @@ class DailyTrainingScreen extends StatefulWidget {
     required this.onReviewResult,
     required this.onCompleted,
     this.onTaskResult,
+    this.onTelemetry,
     this.title = '今日訓練',
   });
 
@@ -44,15 +50,56 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
   bool _saving = false;
   int _consecutiveWrong = 0;
   String? _adaptiveNotice;
+  String? _hintText;
+  bool _usedHint = false;
+  late DateTime _taskStartedAt;
   final Map<String, int> _correctByType = <String, int>{};
 
   @override
   void initState() {
     super.initState();
     _tasks = [...widget.plan.tasks];
+    _taskStartedAt = DateTime.now();
   }
 
   DailyTrainingTask get _task => _tasks[_index];
+
+  Future<void> _recordTelemetry(
+    DailyTrainingTask task,
+    bool correct,
+  ) async {
+    final now = DateTime.now();
+    final telemetry = TrainingTelemetry(
+      id: now.microsecondsSinceEpoch.toString(),
+      taskId: task.id,
+      type: task.type,
+      correct: correct,
+      responseMs: now
+          .difference(_taskStartedAt)
+          .inMilliseconds
+          .clamp(0, 120000)
+          .toInt(),
+      usedHint: _usedHint,
+      recordedAt: now,
+    );
+    await widget.onTelemetry?.call(telemetry);
+  }
+
+  void _showHint() {
+    final task = _task;
+    if (_usedHint) return;
+    final explanation = task.explanation.trim();
+    final answer = task.answer.trim();
+    final hint = explanation.isNotEmpty
+        ? explanation
+        : answer.isEmpty
+            ? '先想想這題屬於「${_typeLabel(task.type)}」的哪一種規則。'
+            : '答案開頭：${answer.substring(0, 1)}…';
+    setState(() {
+      _usedHint = true;
+      _hintText = hint;
+    });
+  }
 
   Future<void> _choose(int choice) async {
     if (_selectedChoice != null || _saving) return;
@@ -72,6 +119,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
       await widget.onReviewResult(learningItemId, isCorrect);
     }
     await widget.onTaskResult?.call(task, isCorrect);
+    await _recordTelemetry(task, isCorrect);
     _adaptAfterResult(task, isCorrect);
   }
 
@@ -125,6 +173,7 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
       await widget.onReviewResult(learningItemId, remembered);
     }
     await widget.onTaskResult?.call(task, remembered);
+    await _recordTelemetry(task, remembered);
     _adaptAfterResult(task, remembered);
 
     if (!mounted) return;
@@ -138,6 +187,9 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
         _index++;
         _selectedChoice = null;
         _revealed = false;
+        _usedHint = false;
+        _hintText = null;
+        _taskStartedAt = DateTime.now();
       });
       return;
     }
@@ -311,12 +363,25 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
                       children: [
                         Icon(_typeIcon(task.type), size: 20),
                         const SizedBox(width: 8),
-                        Text(
-                          task.title,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                  ),
+                        Expanded(
+                          child: Text(
+                            task.title,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        ),
+                        IconButton(
+                          key: const ValueKey('daily-hint-button'),
+                          tooltip: '給我提示',
+                          onPressed: _usedHint || answered ? null : _showHint,
+                          icon: const Icon(
+                            Icons.lightbulb_outline_rounded,
+                            size: 20,
+                          ),
                         ),
                       ],
                     ),
@@ -351,6 +416,18 @@ class _DailyTrainingScreenState extends State<DailyTrainingScreen> {
                                         fontWeight: FontWeight.w900,
                                       ),
                             ),
+                            if (_hintText != null)
+                              Container(
+                                key: const ValueKey('daily-hint-box'),
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF8E7),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(_hintText!),
+                              ),
                             if (task.isMultipleChoice) ...[
                               const SizedBox(height: 18),
                               for (var optionIndex = 0;
