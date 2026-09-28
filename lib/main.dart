@@ -410,6 +410,7 @@ class _MainShellState extends State<MainShell> {
     await _dailyGoalStore.save(goal);
     if (!mounted) return;
     setState(() => _dailyGoal = goal);
+    _markLocalChanged(refreshMemory: false);
   }
 
   String _speakingMemoryHint() {
@@ -501,6 +502,7 @@ class _MainShellState extends State<MainShell> {
           ? updated
           : updated.sublist(updated.length - 20);
     });
+    _markLocalChanged();
   }
 
   DailyTrainingPlan _buildDailyTrainingPlan() {
@@ -532,6 +534,7 @@ class _MainShellState extends State<MainShell> {
       _mistakes = mistakes;
       _abilityRecords = abilities;
     });
+    _markLocalChanged();
   }
 
   Future<void> _recordSpeakingResult(
@@ -560,6 +563,14 @@ class _MainShellState extends State<MainShell> {
       _speakingHistory =
           results[1] as List<SpeakingAttempt>;
     });
+    _markLocalChanged();
+  }
+
+  Future<void> _recordTelemetry(TrainingTelemetry telemetry) async {
+    final updated = await _telemetryStore.append(telemetry);
+    if (!mounted) return;
+    setState(() => _trainingTelemetry = updated);
+    _markLocalChanged(refreshMemory: false);
   }
 
   Future<void> _startMistakeTraining() async {
@@ -594,6 +605,7 @@ class _MainShellState extends State<MainShell> {
       _dailyTrainingSummary = summary;
       _trainingHistory = history;
     });
+    _markLocalChanged();
   }
 
   Future<void> _startDailyTraining() async {
@@ -649,6 +661,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _savedItems = updatedItems;
     });
+    _markLocalChanged();
     return true;
   }
 
@@ -684,6 +697,7 @@ class _MainShellState extends State<MainShell> {
       _weaknesses = records;
       _isLoadingWeaknesses = false;
     });
+    _markLocalChanged();
   }
 
   Future<void> _deleteLearningItem(String id) async {
@@ -696,6 +710,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _savedItems = updatedItems;
     });
+    _markLocalChanged();
   }
 
   Future<void> _updateLearningItemCategory(
@@ -716,6 +731,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _savedItems = updatedItems;
     });
+    _markLocalChanged();
   }
 
   Future<void> _restoreLearningItems(List<LearningItem> items) async {
@@ -725,6 +741,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _savedItems = items;
     });
+    _markLocalChanged();
   }
 
   Future<void> _openProgressCenter() async {
@@ -791,6 +808,7 @@ class _MainShellState extends State<MainShell> {
     final completed = await _courseProgressStore.complete(chapterId);
     if (mounted) {
       setState(() => _completedCourseChapters = completed);
+      _markLocalChanged(refreshMemory: false);
     }
     return completed;
   }
@@ -1036,6 +1054,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _savedItems = updatedItems;
     });
+    _markLocalChanged();
   }
 
   void _openPage(int index) {
