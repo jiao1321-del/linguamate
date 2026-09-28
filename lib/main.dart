@@ -33,6 +33,7 @@ import 'screens/intelligence_hub_screen.dart';
 import 'screens/learner_memory_screen.dart';
 import 'screens/learning_insights_screen.dart';
 import 'screens/live_voice_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
@@ -64,6 +65,7 @@ import 'services/learning_path_planner.dart';
 import 'services/learning_progress_store.dart';
 import 'services/learning_store.dart';
 import 'services/mistake_store.dart';
+import 'services/onboarding_store.dart';
 import 'services/roadmap_30_store.dart';
 import 'services/roleplay_campaign_store.dart';
 import 'services/speaking_history_store.dart';
@@ -118,6 +120,7 @@ class _MainShellState extends State<MainShell> {
   final _telemetryStore = const TrainingTelemetryStore();
   final _campaignStore = const RoleplayCampaignStore();
   final _roadmapStore = const Roadmap30Store();
+  final _onboardingStore = const OnboardingStore();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
@@ -205,9 +208,92 @@ class _MainShellState extends State<MainShell> {
               email: session.email,
             );
     });
+
+    unawaited(_showOnboardingIfNeeded());
+
     if (_autoSyncEnabled && session != null) {
       await _autoSyncNow();
     }
+  }
+
+  Future<void> _showOnboardingIfNeeded() async {
+    final completed = await _onboardingStore.isCompleted();
+    if (!mounted || completed) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_openOnboarding());
+    });
+  }
+
+  String _scenarioForOnboardingGoal(String goal) {
+    if (goal == '旅遊英文') return '旅行';
+    if (goal == '工作英文' ||
+        goal == '面試英文' ||
+        goal == '會議／報告英文') {
+      return '工作職場';
+    }
+    return '日常生活';
+  }
+
+  Future<void> _finishOnboarding(
+    String language,
+    String goal,
+  ) async {
+    final existing = await _aiChatStore.load();
+    final scenario = _scenarioForOnboardingGoal(goal);
+
+    await _onboardingStore.complete(
+      language: language,
+      goal: goal,
+    );
+    await _roadmapStore.saveGoal(goal);
+    await _aiChatStore.save(
+      AiChatState(
+        targetLanguage: language,
+        scenario: scenario,
+        messages: existing?.messages ?? const <AiChatMessage>[],
+      ),
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _roadmapGoal = goal;
+      _index = 2;
+      _dataRevision++;
+    });
+    _markLocalChanged(refreshMemory: false);
+  }
+
+  Future<void> _skipOnboarding() async {
+    await _onboardingStore.skip();
+  }
+
+  Future<void> _openOnboarding() async {
+    final existing = await _aiChatStore.load();
+    final storedLanguage = await _onboardingStore.loadLanguage();
+    final storedGoal = await _onboardingStore.loadGoal();
+    if (!mounted) return;
+
+    final initialLanguage =
+        existing?.targetLanguage.trim().isNotEmpty == true
+            ? existing!.targetLanguage.trim()
+            : storedLanguage;
+    final initialGoal =
+        _roadmapGoal.trim().isNotEmpty ? _roadmapGoal : storedGoal;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (context) => OnboardingScreen(
+          initialLanguage: initialLanguage,
+          initialGoal: initialGoal,
+          onOpenCloud: _openCloudSync,
+          onFinish: _finishOnboarding,
+          onSkip: _skipOnboarding,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadSavedItems() async {
@@ -1456,6 +1542,7 @@ class _MainShellState extends State<MainShell> {
         onOpenSpeaking: _openSpeakingProgress,
         onOpenCourse: _openCoursePlan,
         onOpenCloud: _openCloudSync,
+        onOpenOnboarding: _openOnboarding,
         onOpenBackup: _openBackup,
       ),
     ];
