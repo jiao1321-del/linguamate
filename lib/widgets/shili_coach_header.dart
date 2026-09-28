@@ -35,79 +35,101 @@ class ShiliCoachHeader extends StatelessWidget {
   String get _subtitle {
     switch (targetLanguage) {
       case 'Tagalog':
-        return '陪你練自然、日常的 Tagalog';
+        return '陪你練自然 Tagalog';
       case 'Taglish':
-        return '陪你練真正會用到的 Taglish';
+        return '陪你練實用 Taglish';
       default:
         return '陪你把 English 說得更自然';
     }
   }
 
   Widget _selector({
-    required String label,
     required String value,
     required List<String> items,
     required ValueChanged<String> onChanged,
     required Key key,
+    required IconData icon,
   }) {
     return Expanded(
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          isDense: true,
-          contentPadding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
-          filled: true,
-          fillColor: const Color(0xFFF8F5FC),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none,
-          ),
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8F5FC),
+          borderRadius: BorderRadius.circular(999),
         ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            key: key,
-            value: value,
-            isExpanded: true,
-            isDense: true,
-            icon: const Icon(Icons.keyboard_arrow_down_rounded),
-            items: items
-                .map(
-                  (item) => DropdownMenuItem<String>(
-                    value: item,
-                    child: Text(
-                      item,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+        child: Row(
+          children: [
+            Icon(icon, size: 17, color: const Color(0xFF6F667B)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  key: key,
+                  value: value,
+                  isExpanded: true,
+                  isDense: true,
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 20,
                   ),
-                )
-                .toList(growable: false),
-            onChanged: enabled
-                ? (selected) {
-                    if (selected != null) onChanged(selected);
-                  }
-                : null,
-          ),
+                  items: items
+                      .map(
+                        (item) => DropdownMenuItem<String>(
+                          value: item,
+                          child: Text(
+                            item,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                  onChanged: enabled
+                      ? (selected) {
+                          if (selected != null) onChanged(selected);
+                        }
+                      : null,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  void _handleMore(String action) {
+    switch (action) {
+      case 'review':
+        onReviewConversation();
+        break;
+      case 'clear':
+        onClearConversation();
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 4, 20, 10),
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      margin: const EdgeInsets.fromLTRB(12, 2, 12, 6),
+      padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: const Color(0xFFEDE6F7),
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x10000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
+            color: Color(0x0D000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -115,90 +137,118 @@ class ShiliCoachHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              const ShiliCoachAvatar(size: 48),
-              const SizedBox(width: 12),
+              const ShiliCoachAvatar(size: 40),
+              const SizedBox(width: 9),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          '汐璃 Shili',
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Text('✨'),
-                      ],
+                    Text(
+                      '汐璃 Shili ✨',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 1),
                     Text(
                       _subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: const Color(0xFF6F667B),
-                            height: 1.3,
+                            color: const Color(0xFF756B82),
+                            height: 1.15,
                           ),
                     ),
                   ],
                 ),
               ),
-              IconButton.filledTonal(
-                key: const ValueKey('starter-ideas-button'),
-                tooltip: '話題靈感',
-                visualDensity: VisualDensity.compact,
-                onPressed: enabled ? onStarterIdeas : null,
-                icon: const Icon(Icons.lightbulb_outline_rounded),
-              ),
-              const SizedBox(width: 2),
-              IconButton(
-                key: const ValueKey('roleplay-missions-button'),
-                tooltip: activeMissionTitle == null
-                    ? '情境任務'
-                    : '任務：$activeMissionTitle',
-                visualDensity: VisualDensity.compact,
-                onPressed: enabled ? onRoleplayMissions : null,
-                icon: Icon(
-                  activeMissionTitle == null
-                      ? Icons.theater_comedy_outlined
-                      : Icons.theater_comedy_rounded,
+              SizedBox(
+                width: 38,
+                height: 38,
+                child: IconButton.filledTonal(
+                  key: const ValueKey('starter-ideas-button'),
+                  tooltip: '話題靈感',
+                  padding: EdgeInsets.zero,
+                  onPressed: enabled ? onStarterIdeas : null,
+                  icon: const Icon(Icons.lightbulb_outline_rounded, size: 20),
                 ),
               ),
-              IconButton(
-                key: const ValueKey('conversation-review-button'),
-                tooltip: '單字・文法・回顧',
-                visualDensity: VisualDensity.compact,
-                onPressed: enabled ? onReviewConversation : null,
-                icon: const Icon(Icons.school_outlined),
+              const SizedBox(width: 3),
+              SizedBox(
+                width: 38,
+                height: 38,
+                child: IconButton(
+                  key: const ValueKey('roleplay-missions-button'),
+                  tooltip: activeMissionTitle == null
+                      ? '情境任務'
+                      : '任務：$activeMissionTitle',
+                  padding: EdgeInsets.zero,
+                  onPressed: enabled ? onRoleplayMissions : null,
+                  icon: Icon(
+                    activeMissionTitle == null
+                        ? Icons.theater_comedy_outlined
+                        : Icons.theater_comedy_rounded,
+                    size: 21,
+                  ),
+                ),
               ),
-              IconButton(
-                key: const ValueKey('clear-chat-button'),
-                tooltip: '清除對話',
-                visualDensity: VisualDensity.compact,
-                onPressed: enabled ? onClearConversation : null,
-                icon: const Icon(Icons.delete_sweep_outlined),
+              SizedBox(
+                width: 38,
+                height: 38,
+                child: PopupMenuButton<String>(
+                  key: const ValueKey('more-ai-actions-button'),
+                  tooltip: '更多',
+                  padding: EdgeInsets.zero,
+                  enabled: enabled,
+                  onSelected: _handleMore,
+                  icon: const Icon(Icons.more_horiz_rounded, size: 22),
+                  itemBuilder: (context) => const [
+                    PopupMenuItem<String>(
+                      key: ValueKey('conversation-review-button'),
+                      value: 'review',
+                      child: Row(
+                        children: [
+                          Icon(Icons.school_outlined, size: 20),
+                          SizedBox(width: 10),
+                          Text('單字・文法・回顧'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      key: ValueKey('clear-chat-button'),
+                      value: 'clear',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_sweep_outlined, size: 20),
+                          SizedBox(width: 10),
+                          Text('清除對話'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 7),
           Row(
             children: [
               _selector(
                 key: const ValueKey('language-selector'),
-                label: '語言',
                 value: targetLanguage,
                 items: languages,
                 onChanged: onLanguageSelected,
+                icon: Icons.translate_rounded,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               _selector(
                 key: const ValueKey('scenario-selector'),
-                label: '情境',
                 value: scenario,
                 items: scenarios,
                 onChanged: onScenarioSelected,
+                icon: Icons.work_outline_rounded,
               ),
             ],
           ),
