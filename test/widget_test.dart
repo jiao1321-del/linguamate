@@ -293,17 +293,22 @@ void main() {
     expect(
       find.descendant(
         of: coachPanel,
-        matching: find.byKey(const ValueKey('conversation-review-button')),
+        matching: find.byKey(const ValueKey('more-ai-actions-button')),
       ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('more-ai-actions-button')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('conversation-review-button')),
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: coachPanel,
-        matching: find.byKey(const ValueKey('clear-chat-button')),
-      ),
+      find.byKey(const ValueKey('clear-chat-button')),
       findsOneWidget,
     );
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
 
     final languageDropdown = tester.widget<DropdownButton<String>>(
       find.byKey(const ValueKey('language-selector')),
@@ -499,6 +504,10 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(
+      find.byKey(const ValueKey('more-ai-actions-button')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
       find.byKey(const ValueKey('conversation-review-button')),
     );
     await tester.pumpAndSettle();
@@ -520,6 +529,10 @@ void main() {
     expect(savedText, 'during inspection');
     expect(find.text('已變成鎏金學習卡並加入收藏 ✨'), findsOneWidget);
 
+    await tester.tap(
+      find.byKey(const ValueKey('more-ai-actions-button')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('conversation-review-button')),
     );
