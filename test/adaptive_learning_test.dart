@@ -167,6 +167,7 @@ void main() {
           title: '文法加強 · 過去式',
           prompt: 'Yesterday I ___ home.',
           answer: 'went',
+          explanation: 'Yesterday 對應過去式 went。',
           wrongCount: 2,
           correctStreak: 0,
           lastWrongAt: now,
