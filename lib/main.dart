@@ -784,6 +784,7 @@ class _MainShellState extends State<MainShell> {
       mistakes: _mistakes,
       weaknesses: _weaknesses,
       dailyGoal: _dailyGoal,
+      telemetry: _trainingTelemetry,
     );
 
     await Navigator.of(context).push(
@@ -801,6 +802,204 @@ class _MainShellState extends State<MainShell> {
       MaterialPageRoute<void>(
         builder: (context) => SpeakingProgressScreen(
           attempts: _speakingHistory,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLearnerMemory() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => LearnerMemoryScreen(
+          profile: _learnerMemory,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLiveVoice() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => LiveVoiceScreen(
+          onSend: _aiChatService.send,
+          learnerMemory: _learnerMemory.summary,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _completeCampaignMission(String missionId) async {
+    final completed = await _campaignStore.complete(missionId);
+    if (!mounted) return;
+    setState(() {
+      _completedCampaignMissions = completed;
+      if (_pendingMissionId == missionId) {
+        _pendingMissionId = null;
+      }
+    });
+    _markLocalChanged(refreshMemory: false);
+  }
+
+  void _launchCampaignMission(String missionId) {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    setState(() {
+      _pendingMissionId = missionId;
+      _index = 2;
+      _dataRevision++;
+    });
+  }
+
+  Future<void> _openRoleplayCampaign() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => RoleplayCampaignScreen(
+          campaign: RoleplayCampaign.overseasWork,
+          completedMissionIds: _completedCampaignMissions,
+          onStartMission: _launchCampaignMission,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setRoadmapGoal(String goal) async {
+    await _roadmapStore.saveGoal(goal);
+    if (!mounted) return;
+    setState(() => _roadmapGoal = goal);
+    _markLocalChanged(refreshMemory: false);
+  }
+
+  Future<Set<String>> _completeRoadmapDay(
+    String goal,
+    int day,
+  ) async {
+    final completed = await _roadmapStore.complete(
+      goal: goal,
+      day: day,
+    );
+    if (mounted) {
+      setState(() => _completedRoadmapDays = completed);
+      _markLocalChanged(refreshMemory: false);
+    }
+    return completed;
+  }
+
+  Future<void> _openRoadmap30() async {
+    final abilityReport = _buildAbilityReport();
+    final priority = abilityReport.priorityLabel ?? '自然表達';
+    final weakness = _weaknesses.isEmpty
+        ? priority
+        : _weaknesses.first.category;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Roadmap30Screen(
+          initialGoal: _roadmapGoal,
+          initialCompleted: _completedRoadmapDays,
+          priority: priority,
+          weakness: weakness,
+          onGoalChanged: _setRoadmapGoal,
+          onComplete: _completeRoadmapDay,
+          onAction: _handleAdaptiveAction,
+        ),
+      ),
+    );
+  }
+
+  GamificationSnapshot _buildGamification(
+    LearningProgressReport progressReport,
+  ) {
+    return GamificationEngine.build(
+      progress: progressReport,
+      speaking: _speakingHistory,
+      dailyGoal: _dailyGoal,
+      courseCompleted: _completedCourseChapters,
+      campaignCompleted: _completedCampaignMissions,
+      roadmapCompleted: _completedRoadmapDays,
+    );
+  }
+
+  LearningInsightsSnapshot _buildInsights(
+    LearningProgressReport progressReport,
+  ) {
+    return LearningInsightsEngine.build(
+      progress: progressReport,
+      abilities: _abilityRecords,
+      mistakes: _mistakes,
+      speaking: _speakingHistory,
+      telemetry: _trainingTelemetry,
+    );
+  }
+
+  Future<void> _openGamification() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => GamificationScreen(
+          snapshot: _buildGamification(progressReport),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openInsights() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => LearningInsightsScreen(
+          snapshot: _buildInsights(progressReport),
+        ),
+      ),
+    );
+  }
+
+  IntelligenceCoreSnapshot _buildIntelligence(
+    LearningProgressReport progressReport,
+    AdaptiveLearningSnapshot adaptiveSnapshot,
+  ) {
+    return IntelligenceCoreEngine.build(
+      memory: _learnerMemory,
+      insights: _buildInsights(progressReport),
+      gamification: _buildGamification(progressReport),
+      learningItems: _savedItems,
+      mistakes: _mistakes,
+      adaptiveDifficulty: adaptiveSnapshot.difficulty,
+      roadmapCompleted: _completedRoadmapDays,
+      campaignCompleted: _completedCampaignMissions,
+      courseCompleted: _completedCourseChapters,
+    );
+  }
+
+  Future<void> _openIntelligenceHub() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    final adaptiveSnapshot = AdaptiveLearningEngine.buildSnapshot(
+      learningItems: _savedItems,
+      abilityReport: abilityReport,
+      progressReport: progressReport,
+      mistakes: _mistakes,
+      weaknesses: _weaknesses,
+      dailyGoal: _dailyGoal,
+      telemetry: _trainingTelemetry,
+    );
+    final snapshot = _buildIntelligence(
+      progressReport,
+      adaptiveSnapshot,
+    );
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => IntelligenceHubScreen(
+          snapshot: snapshot,
+          onAction: _handleAdaptiveAction,
+          onOpenCloud: _openCloudSync,
+          onOpenMemory: _openLearnerMemory,
+          onOpenSpeaking: _openSpeakingProgress,
+          onOpenLiveVoice: _openLiveVoice,
+          onOpenCampaign: _openRoleplayCampaign,
+          onOpenRoadmap: _openRoadmap30,
+          onOpenGamification: _openGamification,
+          onOpenInsights: _openInsights,
         ),
       ),
     );
@@ -1007,6 +1206,10 @@ class _MainShellState extends State<MainShell> {
           service: _cloudSyncService,
           exportLocal: _exportCloudPayload,
           importCloud: _importCloudPayload,
+          status: _cloudStatus,
+          autoSyncEnabled: _autoSyncEnabled,
+          onAutoSyncChanged: _setAutoSyncEnabled,
+          onSyncNow: _autoSyncNow,
         ),
       ),
     );
@@ -1035,6 +1238,22 @@ class _MainShellState extends State<MainShell> {
             content: Text('已切到 Shili，點上方 🎭 選擇情境任務。'),
           ),
         );
+        break;
+      case 'liveVoice':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openLiveVoice();
+        break;
+      case 'roadmap':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openRoadmap30();
+        break;
+      case 'campaign':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openRoleplayCampaign();
+        break;
+      case 'course':
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _openCoursePlan();
         break;
       case 'ai':
         Navigator.of(context).popUntil((route) => route.isFirst);
