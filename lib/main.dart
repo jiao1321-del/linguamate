@@ -130,7 +130,7 @@ class _MainShellState extends State<MainShell> {
   List<DailyTrainingSummary> _trainingHistory = const [];
   List<SpeakingAttempt> _speakingHistory = const [];
   List<TrainingTelemetry> _trainingTelemetry = const [];
-  LearnerMemoryProfile _learnerMemory = const LearnerMemoryProfile.empty();
+  LearnerMemoryProfile _learnerMemory = LearnerMemoryProfile.empty();
   Set<String> _completedCourseChapters = <String>{};
   Set<String> _completedCampaignMissions = <String>{};
   Set<String> _completedRoadmapDays = <String>{};
@@ -923,7 +923,7 @@ class _MainShellState extends State<MainShell> {
         ? LearnerMemoryProfile.fromJson(
             Map<String, dynamic>.from(rawMemory),
           )
-        : const LearnerMemoryProfile.empty();
+        : LearnerMemoryProfile.empty();
     final completedRaw = payload['courseCompleted'];
     final completed = completedRaw is List
         ? completedRaw.whereType<String>().toSet()
