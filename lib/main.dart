@@ -1380,6 +1380,11 @@ class _MainShellState extends State<MainShell> {
       mistakes: _mistakes,
       weaknesses: _weaknesses,
       dailyGoal: _dailyGoal,
+      telemetry: _trainingTelemetry,
+    );
+    final intelligenceSnapshot = _buildIntelligence(
+      progressReport,
+      adaptiveSnapshot,
     );
     final dailyPlan = _buildDailyTrainingPlan();
     final dailyCompleted =
@@ -1410,14 +1415,18 @@ class _MainShellState extends State<MainShell> {
         onSaveLearning: _saveChatLearningItem,
         onWeaknessDetected: _recordChatWeakness,
         onLearningPackUpdated: _captureLearningPack,
-        proactiveCoachMessage: adaptiveSnapshot.coachMessage,
+        proactiveCoachMessage: intelligenceSnapshot.coachMessage,
         learnerMemory: [
+          _learnerMemory.summary,
           adaptiveSnapshot.memory.summary,
           _speakingMemoryHint(),
         ].where((item) => item.trim().isNotEmpty).join('；'),
         onSpeakingResult: _recordSpeakingResult,
-        onStartRecommendedTraining: () =>
-            _handleAdaptiveAction(adaptiveSnapshot.recommendedAction),
+        onStartRecommendedTraining: () => _handleAdaptiveAction(
+          intelligenceSnapshot.nextBestAction.action,
+        ),
+        initialMissionId: _pendingMissionId,
+        onMissionCompleted: _completeCampaignMission,
       ),
       SavedScreen(
         items: _savedItems,
@@ -1436,6 +1445,7 @@ class _MainShellState extends State<MainShell> {
         onOpenProgress: _openProgressCenter,
         onOpenGrowth: _openGrowthCenter,
         onOpenAdaptive: _openAdaptiveLearning,
+        onOpenIntelligence: _openIntelligenceHub,
         onOpenSpeaking: _openSpeakingProgress,
         onOpenCourse: _openCoursePlan,
         onOpenCloud: _openCloudSync,
