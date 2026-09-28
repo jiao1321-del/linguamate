@@ -31,7 +31,7 @@ class PluginSpeechCoachService implements SpeechCoachService {
 
     await _tts.stop();
     await _tts.setLanguage(languageTag);
-    await _tts.setSpeechRate(rate.clamp(0.25, 0.65));
+    await _tts.setSpeechRate(rate.clamp(0.25, 0.65).toDouble());
     await _tts.awaitSpeakCompletion(true);
     await _tts.setPitch(1.02);
     await _tts.speak(normalized);
