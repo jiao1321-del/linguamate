@@ -35,6 +35,21 @@ class RoleplayMissionService {
       ],
     ),
     RoleplayMission(
+      id: 'airport-checkin',
+      title: '機場報到',
+      baseScenario: '旅行',
+      yourRole: '旅客',
+      shiliRole: '航空公司地勤',
+      goal: '完成報到、確認行李與登機資訊。',
+      suggestedOpening: 'Hi, I’d like to check in for my flight.',
+      stages: <String>[
+        '確認航班',
+        '處理證件與座位',
+        '確認行李',
+        '取得登機資訊',
+      ],
+    ),
+    RoleplayMission(
       id: 'work-interview',
       title: '海外工作面試',
       baseScenario: '工作職場',
@@ -92,21 +107,6 @@ class RoleplayMissionService {
         '確認影響',
         '回應質疑',
         '提出處理與追蹤方案',
-      ],
-    ),
-    RoleplayMission(
-      id: 'airport-checkin',
-      title: '機場報到',
-      baseScenario: '旅行',
-      yourRole: '旅客',
-      shiliRole: '航空公司地勤',
-      goal: '完成報到、確認行李與登機資訊。',
-      suggestedOpening: 'Hi, I’d like to check in for my flight.',
-      stages: <String>[
-        '確認航班',
-        '處理證件與座位',
-        '確認行李',
-        '取得登機資訊',
       ],
     ),
     RoleplayMission(
