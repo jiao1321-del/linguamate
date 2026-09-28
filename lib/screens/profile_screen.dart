@@ -20,6 +20,7 @@ class ProfileScreen extends StatelessWidget {
   final VoidCallback? onOpenSpeaking;
   final VoidCallback? onOpenCourse;
   final VoidCallback? onOpenCloud;
+  final VoidCallback? onOpenOnboarding;
   final VoidCallback onOpenBackup;
 
   const ProfileScreen({
@@ -40,6 +41,7 @@ class ProfileScreen extends StatelessWidget {
     this.onOpenSpeaking,
     this.onOpenCourse,
     this.onOpenCloud,
+    this.onOpenOnboarding,
     required this.onOpenBackup,
   });
 
@@ -87,6 +89,23 @@ class ProfileScreen extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
               subtitle: Text('English · Tagalog / Taglish'),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            key: const ValueKey('family-onboarding-entry'),
+            child: ListTile(
+              onTap: onOpenOnboarding,
+              contentPadding: const EdgeInsets.all(18),
+              leading: const Icon(Icons.rocket_launch_outlined),
+              title: const Text(
+                '新手使用指南',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: const Text(
+                '重新查看安裝、Cloud 帳號、語言設定與第一堂課引導',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
             ),
           ),
           const SizedBox(height: 18),
