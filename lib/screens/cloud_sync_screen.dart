@@ -84,8 +84,11 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
         if (!mounted) return;
         setState(() {
           _session = session;
-          _message = '登入成功。';
+          _message = '登入成功，正在同步…';
         });
+        await widget.onSyncNow();
+        if (!mounted) return;
+        setState(() => _message = '登入成功，已完成第一次合併同步 ☁️');
       });
 
   Future<void> _signUp() => _run(() async {
@@ -98,8 +101,13 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
           _session = session;
           _message = session == null
               ? '帳號已建立。若專案啟用 Email 驗證，請先完成信箱驗證後再登入。'
-              : '帳號已建立並登入。';
+              : '帳號已建立並登入，正在同步…';
         });
+        if (session != null) {
+          await widget.onSyncNow();
+          if (!mounted) return;
+          setState(() => _message = '帳號已建立並完成第一次合併同步 ☁️');
+        }
       });
 
   Future<void> _upload() => _run(() async {
