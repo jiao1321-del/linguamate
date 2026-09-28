@@ -278,6 +278,29 @@ void main() {
       find.byKey(const ValueKey('proactive-shili-coach')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('start-coach-recommendation')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('start-speaking-assessment')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('toggle-proactive-coach')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('start-coach-recommendation')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('start-speaking-assessment')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('toggle-proactive-coach')));
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.byKey(const ValueKey('chat-input')),
