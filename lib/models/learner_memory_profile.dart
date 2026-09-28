@@ -19,15 +19,16 @@ class LearnerMemoryProfile {
     required this.summary,
   });
 
-  const LearnerMemoryProfile.empty()
-      : updatedAt = const DateTime.fromMillisecondsSinceEpoch(0),
-        masteredSkills = const <String>[],
-        weakSkills = const <String>[],
-        staleSkills = const <String>[],
-        commonMistakes = const <String>[],
-        speakingWeakWords = const <String>[],
-        preferredScenario = '自由對話',
-        summary = '';
+  factory LearnerMemoryProfile.empty() => LearnerMemoryProfile(
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
+        masteredSkills: const <String>[],
+        weakSkills: const <String>[],
+        staleSkills: const <String>[],
+        commonMistakes: const <String>[],
+        speakingWeakWords: const <String>[],
+        preferredScenario: '自由對話',
+        summary: '',
+      );
 
   Map<String, dynamic> toJson() => {
         'updatedAt': updatedAt.toUtc().toIso8601String(),
