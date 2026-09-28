@@ -117,10 +117,10 @@ class AdaptiveLearningSnapshot {
   });
 
   String get difficultyLabel => switch (difficulty) {
-        <= 1 => '基礎',
-        2 => '初階',
-        3 => '中階',
-        4 => '中高階',
+        <= 2 => '基礎',
+        <= 4 => '初階',
+        <= 6 => '中階',
+        <= 8 => '中高階',
         _ => '進階',
       };
 }
