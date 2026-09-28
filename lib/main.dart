@@ -685,7 +685,8 @@ class _MainShellState extends State<MainShell> {
         proactiveCoachMessage: adaptiveSnapshot.coachMessage,
         learnerMemory: adaptiveSnapshot.memory.summary,
         onSpeakingResult: _recordSpeakingResult,
-        onStartRecommendedTraining: _startDailyTraining,
+        onStartRecommendedTraining: () =>
+            _handleAdaptiveAction(adaptiveSnapshot.recommendedAction),
       ),
       SavedScreen(
         items: _savedItems,
