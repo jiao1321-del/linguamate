@@ -378,6 +378,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('daily-next-task')));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('daily-choice-1')),
+    );
     await tester.tap(find.byKey(const ValueKey('daily-choice-1')));
     await tester.pumpAndSettle();
 
@@ -386,6 +389,9 @@ void main() {
       findsOneWidget,
     );
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('daily-next-task')),
+    );
     await tester.tap(find.byKey(const ValueKey('daily-next-task')));
     await tester.pumpAndSettle();
 
