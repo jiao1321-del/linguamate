@@ -543,6 +543,174 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
+  Future<void> _openSpeakingProgress() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => SpeakingProgressScreen(
+          attempts: _speakingHistory,
+        ),
+      ),
+    );
+  }
+
+  Future<Set<String>> _completeCourseChapter(String chapterId) async {
+    final completed = await _courseProgressStore.complete(chapterId);
+    if (mounted) {
+      setState(() => _completedCourseChapters = completed);
+    }
+    return completed;
+  }
+
+  Future<void> _openCoursePlan() async {
+    final abilityReport = _buildAbilityReport();
+    final progressReport = _buildProgressReport(abilityReport);
+    final plan = AdaptiveCourseGenerator.generate(
+      abilityReport: abilityReport,
+      progressReport: progressReport,
+      mistakes: _mistakes,
+      weaknesses: _weaknesses,
+    );
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => CoursePlanScreen(
+          plan: plan,
+          initialCompleted: _completedCourseChapters,
+          onCompleteChapter: _completeCourseChapter,
+          onAction: _handleAdaptiveAction,
+        ),
+      ),
+    );
+  }
+
+  List<T> _decodeCloudList<T>(
+    dynamic raw,
+    T Function(Map<String, dynamic> json) parser,
+  ) {
+    if (raw is! List) return <T>[];
+    final items = <T>[];
+    for (final entry in raw.whereType<Map>()) {
+      try {
+        items.add(parser(Map<String, dynamic>.from(entry)));
+      } catch (_) {}
+    }
+    return items;
+  }
+
+  Future<Map<String, dynamic>> _exportCloudPayload() async {
+    final chatState = await _aiChatStore.load();
+    return {
+      'schemaVersion': 136,
+      'savedItems': _savedItems.map((item) => item.toJson()).toList(),
+      'weaknesses': _weaknesses.map((item) => item.toJson()).toList(),
+      'mistakes': _mistakes.map((item) => item.toJson()).toList(),
+      'abilities': _abilityRecords.map((item) => item.toJson()).toList(),
+      'trainingHistory':
+          _trainingHistory.map((item) => item.toJson()).toList(),
+      'dailyGoal': _dailyGoal,
+      'speakingHistory':
+          _speakingHistory.map((item) => item.toJson()).toList(),
+      'courseCompleted': _completedCourseChapters.toList(),
+      'chatState': chatState?.toJson(),
+      'syncedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
+
+  Future<void> _importCloudPayload(Map<String, dynamic> payload) async {
+    final items = _decodeCloudList<LearningItem>(
+      payload['savedItems'],
+      LearningItem.fromJson,
+    );
+    final weaknesses = _decodeCloudList<WeaknessRecord>(
+      payload['weaknesses'],
+      WeaknessRecord.fromJson,
+    );
+    final mistakes = _decodeCloudList<MistakeRecord>(
+      payload['mistakes'],
+      MistakeRecord.fromJson,
+    );
+    final abilities = _decodeCloudList<LearningAbilityRecord>(
+      payload['abilities'],
+      LearningAbilityRecord.fromJson,
+    );
+    final history = _decodeCloudList<DailyTrainingSummary>(
+      payload['trainingHistory'],
+      DailyTrainingSummary.fromJson,
+    );
+    final speaking = _decodeCloudList<SpeakingAttempt>(
+      payload['speakingHistory'],
+      SpeakingAttempt.fromJson,
+    );
+    final completedRaw = payload['courseCompleted'];
+    final completed = completedRaw is List
+        ? completedRaw.whereType<String>().toSet()
+        : <String>{};
+    final goal = (payload['dailyGoal'] as num?)?.toInt() ??
+        DailyGoalStore.defaultGoal;
+    final rawChat = payload['chatState'];
+    final chatState = rawChat is Map
+        ? AiChatState.fromJson(Map<String, dynamic>.from(rawChat))
+        : null;
+
+    await _learningStore.saveItems(items);
+    await _weaknessStore.replace(weaknesses);
+    await _mistakeStore.replace(mistakes);
+    await _learningAbilityStore.replace(abilities);
+    await _learningProgressStore.replace(history);
+    await _dailyGoalStore.save(goal);
+    await _speakingHistoryStore.replace(speaking);
+    await _courseProgressStore.replace(completed);
+
+    if (chatState == null) {
+      await _aiChatStore.clear();
+    } else {
+      await _aiChatStore.save(chatState);
+    }
+
+    if (history.isEmpty) {
+      await _dailyTrainingStore.clear();
+    } else {
+      await _dailyTrainingStore.save(history.first);
+    }
+
+    if (!mounted) return;
+    final replies = chatState?.messages
+            .map((message) => message.reply)
+            .whereType<AiCoachReply>()
+            .toList(growable: false) ??
+        const <AiCoachReply>[];
+
+    setState(() {
+      _savedItems = items;
+      _weaknesses = weaknesses;
+      _mistakes = mistakes;
+      _abilityRecords = abilities;
+      _trainingHistory = history;
+      _dailyTrainingSummary = history.isEmpty ? null : history.first;
+      _dailyGoal = DailyGoalStore.supportedGoals.contains(goal)
+          ? goal
+          : DailyGoalStore.defaultGoal;
+      _speakingHistory = speaking;
+      _completedCourseChapters = completed;
+      _coachReplies = replies;
+      _isLoadingSavedItems = false;
+      _isLoadingWeaknesses = false;
+      _dataRevision++;
+    });
+  }
+
+  Future<void> _openCloudSync() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => CloudSyncScreen(
+          service: _cloudSyncService,
+          exportLocal: _exportCloudPayload,
+          importCloud: _importCloudPayload,
+        ),
+      ),
+    );
+  }
+
   void _handleAdaptiveAction(String action) {
     switch (action) {
       case 'mistakes':
