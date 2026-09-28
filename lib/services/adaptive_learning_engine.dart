@@ -5,6 +5,7 @@ import '../models/learning_ability.dart';
 import '../models/learning_item.dart';
 import '../models/learning_progress.dart';
 import '../models/mistake_record.dart';
+import '../models/training_telemetry.dart';
 import '../models/weakness_record.dart';
 import 'daily_training_plan_builder.dart';
 
@@ -18,6 +19,7 @@ class AdaptiveLearningEngine {
     required List<MistakeRecord> mistakes,
     required List<WeaknessRecord> weaknesses,
     required int dailyGoal,
+    List<TrainingTelemetry> telemetry = const <TrainingTelemetry>[],
     DateTime? now,
   }) {
     final reference = now ?? DateTime.now();
@@ -45,6 +47,7 @@ class AdaptiveLearningEngine {
       tasks: progressReport.totalTasks,
       accuracy: progressReport.overallAccuracy,
       mastered: abilityReport.masteredCount,
+      telemetry: telemetry,
     );
 
     final mastered = abilityReport.records
@@ -394,13 +397,40 @@ class AdaptiveLearningEngine {
     required int tasks,
     required int accuracy,
     required int mastered,
+    required List<TrainingTelemetry> telemetry,
   }) {
-    var value = 1;
+    var value = 2;
     if (tasks >= 20) value++;
-    if (tasks >= 80 && accuracy >= 65) value++;
-    if (tasks >= 160 && accuracy >= 75) value++;
-    if (mastered >= 4 && accuracy >= 82) value++;
-    return value.clamp(1, 5).toInt();
+    if (tasks >= 60 && accuracy >= 60) value++;
+    if (tasks >= 100 && accuracy >= 70) value++;
+    if (tasks >= 180 && accuracy >= 78) value++;
+    if (mastered >= 3) value++;
+    if (mastered >= 6) value++;
+
+    final recent = telemetry.take(30).toList(growable: false);
+    if (recent.isNotEmpty) {
+      final correct =
+          recent.where((item) => item.correct).length / recent.length;
+      final hinted =
+          recent.where((item) => item.usedHint).length / recent.length;
+      final avgMs = recent.fold<int>(
+            0,
+            (sum, item) => sum + item.responseMs,
+          ) /
+          recent.length;
+
+      if (correct >= 0.85 && hinted <= 0.15 && avgMs <= 9000) {
+        value += 2;
+      } else if (correct >= 0.75 && hinted <= 0.25) {
+        value++;
+      }
+      if (correct < 0.55 || hinted >= 0.45) {
+        value -= 2;
+      } else if (avgMs >= 20000) {
+        value--;
+      }
+    }
+    return value.clamp(1, 10).toInt();
   }
 
   static String _coachMessage({
