@@ -854,7 +854,7 @@ class _MainShellState extends State<MainShell> {
   Future<Map<String, dynamic>> _exportCloudPayload() async {
     final chatState = await _aiChatStore.load();
     return {
-      'schemaVersion': 136,
+      'schemaVersion': 146,
       'savedItems': _savedItems.map((item) => item.toJson()).toList(),
       'weaknesses': _weaknesses.map((item) => item.toJson()).toList(),
       'mistakes': _mistakes.map((item) => item.toJson()).toList(),
@@ -865,12 +865,21 @@ class _MainShellState extends State<MainShell> {
       'speakingHistory':
           _speakingHistory.map((item) => item.toJson()).toList(),
       'courseCompleted': _completedCourseChapters.toList(),
+      'campaignCompleted': _completedCampaignMissions.toList(),
+      'roadmapCompleted': _completedRoadmapDays.toList(),
+      'roadmapGoal': _roadmapGoal,
+      'trainingTelemetry':
+          _trainingTelemetry.map((item) => item.toJson()).toList(),
+      'learnerMemory': _learnerMemory.toJson(),
       'chatState': chatState?.toJson(),
-      'syncedAt': DateTime.now().toUtc().toIso8601String(),
+      'syncedAt': _localUpdatedAt.toUtc().toIso8601String(),
     };
   }
 
-  Future<void> _importCloudPayload(Map<String, dynamic> payload) async {
+  Future<void> _importCloudPayload(
+    Map<String, dynamic> payload, {
+    bool fromSync = false,
+  }) async {
     final items = _decodeCloudList<LearningItem>(
       payload['savedItems'],
       LearningItem.fromJson,
@@ -895,6 +904,26 @@ class _MainShellState extends State<MainShell> {
       payload['speakingHistory'],
       SpeakingAttempt.fromJson,
     );
+    final telemetry = _decodeCloudList<TrainingTelemetry>(
+      payload['trainingTelemetry'],
+      TrainingTelemetry.fromJson,
+    );
+    final campaignRaw = payload['campaignCompleted'];
+    final campaignCompleted = campaignRaw is List
+        ? campaignRaw.whereType<String>().toSet()
+        : <String>{};
+    final roadmapRaw = payload['roadmapCompleted'];
+    final roadmapCompleted = roadmapRaw is List
+        ? roadmapRaw.whereType<String>().toSet()
+        : <String>{};
+    final roadmapGoal =
+        (payload['roadmapGoal'] as String? ?? '日常英文').trim();
+    final rawMemory = payload['learnerMemory'];
+    final learnerMemory = rawMemory is Map
+        ? LearnerMemoryProfile.fromJson(
+            Map<String, dynamic>.from(rawMemory),
+          )
+        : const LearnerMemoryProfile.empty();
     final completedRaw = payload['courseCompleted'];
     final completed = completedRaw is List
         ? completedRaw.whereType<String>().toSet()
@@ -914,6 +943,11 @@ class _MainShellState extends State<MainShell> {
     await _dailyGoalStore.save(goal);
     await _speakingHistoryStore.replace(speaking);
     await _courseProgressStore.replace(completed);
+    await _telemetryStore.replace(telemetry);
+    await _campaignStore.replace(campaignCompleted);
+    await _roadmapStore.replace(roadmapCompleted);
+    await _roadmapStore.saveGoal(roadmapGoal);
+    await _learnerMemoryStore.save(learnerMemory);
 
     if (chatState == null) {
       await _aiChatStore.clear();
@@ -945,12 +979,25 @@ class _MainShellState extends State<MainShell> {
           ? goal
           : DailyGoalStore.defaultGoal;
       _speakingHistory = speaking;
+      _trainingTelemetry = telemetry;
       _completedCourseChapters = completed;
+      _completedCampaignMissions = campaignCompleted;
+      _completedRoadmapDays = roadmapCompleted;
+      _roadmapGoal = roadmapGoal.isEmpty ? '日常英文' : roadmapGoal;
+      _learnerMemory = learnerMemory;
       _coachReplies = replies;
       _isLoadingSavedItems = false;
       _isLoadingWeaknesses = false;
       _dataRevision++;
     });
+    final syncedAt =
+        DateTime.tryParse(payload['syncedAt'] as String? ?? '');
+    if (syncedAt != null && syncedAt.isAfter(_localUpdatedAt)) {
+      _localUpdatedAt = syncedAt.toLocal();
+    }
+    if (!fromSync) {
+      _markLocalChanged(refreshMemory: false);
+    }
   }
 
   Future<void> _openCloudSync() async {
