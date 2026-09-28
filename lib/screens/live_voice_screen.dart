@@ -118,10 +118,14 @@ class _LiveVoiceScreenState extends State<LiveVoiceScreen> {
             )
             .toList(growable: false);
 
+        final memory = widget.learnerMemory.trim();
+        final scenario = memory.isEmpty
+            ? '自由對話'
+            : '自由對話\n\nLearner memory: $memory';
         final reply = await widget.onSend(
           normalized,
           _language,
-          '自由對話',
+          scenario,
           history,
         );
 
