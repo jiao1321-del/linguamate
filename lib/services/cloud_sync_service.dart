@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -202,7 +203,7 @@ class CloudSyncService {
     if (!session.isValid) {
       throw const CloudSyncException('登入資訊不完整，請重新登入。');
     }
-    _persistSession(session);
+    unawaited(_persistSession(session));
     return session;
   }
 
