@@ -244,6 +244,13 @@ class AdaptiveLearningEngine {
         score: 0,
         missingWords: targetTokens,
         naturalSuggestion: target,
+        wordFeedback: [
+          for (final word in targetTokens)
+            SpeakingTokenFeedback(
+              word: word,
+              status: SpeakingTokenStatus.missing,
+            ),
+        ],
       );
     }
 
@@ -289,7 +296,79 @@ class AdaptiveLearningEngine {
       score: score,
       missingWords: missing.take(6).toList(growable: false),
       naturalSuggestion: target,
+      wordFeedback: _alignSpeakingWords(targetTokens, spokenTokens),
     );
+  }
+
+  static List<SpeakingTokenFeedback> _alignSpeakingWords(
+    List<String> target,
+    List<String> spoken,
+  ) {
+    final rows = target.length + 1;
+    final cols = spoken.length + 1;
+    final dp = List.generate(
+      rows,
+      (_) => List<int>.filled(cols, 0),
+    );
+
+    for (var i = target.length - 1; i >= 0; i--) {
+      for (var j = spoken.length - 1; j >= 0; j--) {
+        dp[i][j] = target[i] == spoken[j]
+            ? dp[i + 1][j + 1] + 1
+            : (dp[i + 1][j] >= dp[i][j + 1]
+                ? dp[i + 1][j]
+                : dp[i][j + 1]);
+      }
+    }
+
+    final result = <SpeakingTokenFeedback>[];
+    var i = 0;
+    var j = 0;
+    while (i < target.length && j < spoken.length) {
+      if (target[i] == spoken[j]) {
+        result.add(
+          SpeakingTokenFeedback(
+            word: target[i],
+            status: SpeakingTokenStatus.correct,
+          ),
+        );
+        i++;
+        j++;
+      } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+        result.add(
+          SpeakingTokenFeedback(
+            word: target[i],
+            status: SpeakingTokenStatus.missing,
+          ),
+        );
+        i++;
+      } else {
+        result.add(
+          SpeakingTokenFeedback(
+            word: spoken[j],
+            status: SpeakingTokenStatus.extra,
+          ),
+        );
+        j++;
+      }
+    }
+    while (i < target.length) {
+      result.add(
+        SpeakingTokenFeedback(
+          word: target[i++],
+          status: SpeakingTokenStatus.missing,
+        ),
+      );
+    }
+    while (j < spoken.length) {
+      result.add(
+        SpeakingTokenFeedback(
+          word: spoken[j++],
+          status: SpeakingTokenStatus.extra,
+        ),
+      );
+    }
+    return result;
   }
 
   static List<String> _tokens(String text) => text
