@@ -1,8 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'models/adaptive_learning.dart';
 import 'models/ai_chat_state.dart';
 import 'models/ai_coach_reply.dart';
+import 'models/cloud_sync_status.dart';
+import 'models/gamification.dart';
+import 'models/intelligence_core.dart';
+import 'models/learner_memory_profile.dart';
+import 'models/learning_insights.dart';
 import 'models/daily_training.dart';
 import 'models/language_analysis.dart';
 import 'models/learning_item.dart';
@@ -10,7 +17,9 @@ import 'models/learning_ability.dart';
 import 'models/learning_path.dart';
 import 'models/learning_progress.dart';
 import 'models/mistake_record.dart';
+import 'models/roleplay_campaign.dart';
 import 'models/speaking_attempt.dart';
+import 'models/training_telemetry.dart';
 import 'models/weakness_record.dart';
 import 'screens/adaptive_learning_screen.dart';
 import 'screens/ai_chat_screen.dart';
@@ -18,31 +27,47 @@ import 'screens/backup_screen.dart';
 import 'screens/cloud_sync_screen.dart';
 import 'screens/course_plan_screen.dart';
 import 'screens/daily_training_screen.dart';
+import 'screens/gamification_screen.dart';
 import 'screens/growth_center_screen.dart';
+import 'screens/intelligence_hub_screen.dart';
+import 'screens/learner_memory_screen.dart';
+import 'screens/learning_insights_screen.dart';
+import 'screens/live_voice_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/progress_center_screen.dart';
 import 'screens/review_screen.dart';
+import 'screens/roadmap_30_screen.dart';
+import 'screens/roleplay_campaign_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/speaking_progress_screen.dart';
 import 'services/adaptive_course_generator.dart';
 import 'services/adaptive_learning_engine.dart';
 import 'services/ai_chat_service.dart';
 import 'services/ai_chat_store.dart';
+import 'services/cloud_payload_merger.dart';
 import 'services/cloud_sync_service.dart';
 import 'services/course_progress_store.dart';
 import 'services/daily_training_plan_builder.dart';
 import 'services/daily_training_store.dart';
 import 'services/daily_goal_store.dart';
+import 'services/gamification_engine.dart';
+import 'services/intelligence_core_engine.dart';
 import 'services/language_analysis_service.dart';
 import 'services/learning_ability_analyzer.dart';
 import 'services/learning_ability_store.dart';
+import 'services/learner_memory_engine.dart';
+import 'services/learner_memory_store.dart';
+import 'services/learning_insights_engine.dart';
 import 'services/learning_path_planner.dart';
 import 'services/learning_progress_store.dart';
 import 'services/learning_store.dart';
 import 'services/mistake_store.dart';
+import 'services/roadmap_30_store.dart';
+import 'services/roleplay_campaign_store.dart';
 import 'services/speaking_history_store.dart';
+import 'services/training_telemetry_store.dart';
 import 'services/weakness_classifier.dart';
 import 'services/weakness_store.dart';
 
@@ -89,6 +114,10 @@ class _MainShellState extends State<MainShell> {
   final _speakingHistoryStore = const SpeakingHistoryStore();
   final _courseProgressStore = const CourseProgressStore();
   final _cloudSyncService = const CloudSyncService();
+  final _learnerMemoryStore = const LearnerMemoryStore();
+  final _telemetryStore = const TrainingTelemetryStore();
+  final _campaignStore = const RoleplayCampaignStore();
+  final _roadmapStore = const Roadmap30Store();
 
   int _index = 0;
   bool _isLoadingSavedItems = true;
@@ -100,23 +129,79 @@ class _MainShellState extends State<MainShell> {
   List<LearningAbilityRecord> _abilityRecords = const [];
   List<DailyTrainingSummary> _trainingHistory = const [];
   List<SpeakingAttempt> _speakingHistory = const [];
+  List<TrainingTelemetry> _trainingTelemetry = const [];
+  LearnerMemoryProfile _learnerMemory = const LearnerMemoryProfile.empty();
   Set<String> _completedCourseChapters = <String>{};
+  Set<String> _completedCampaignMissions = <String>{};
+  Set<String> _completedRoadmapDays = <String>{};
   DailyTrainingSummary? _dailyTrainingSummary;
   int _dailyGoal = DailyGoalStore.defaultGoal;
+  String _roadmapGoal = '日常英文';
+  String? _pendingMissionId;
   int _dataRevision = 0;
+  bool _autoSyncEnabled = true;
+  bool _syncInProgress = false;
+  DateTime _localUpdatedAt = DateTime.fromMillisecondsSinceEpoch(0);
+  CloudSyncStatus _cloudStatus = const CloudSyncStatus.signedOut();
+  Timer? _cloudSyncDebounce;
 
   @override
   void initState() {
     super.initState();
-    _loadSavedItems();
-    _loadWeaknesses();
-    _loadTrainingContext();
-    _loadMistakes();
-    _loadLearningAbility();
-    _loadLearningProgress();
-    _loadDailyGoal();
-    _loadSpeakingHistory();
-    _loadCourseProgress();
+    unawaited(_bootstrap());
+  }
+
+  @override
+  void dispose() {
+    _cloudSyncDebounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _bootstrap() async {
+    await Future.wait<void>([
+      _loadSavedItems(),
+      _loadWeaknesses(),
+      _loadTrainingContext(),
+      _loadMistakes(),
+      _loadLearningAbility(),
+      _loadLearningProgress(),
+      _loadDailyGoal(),
+      _loadSpeakingHistory(),
+      _loadCourseProgress(),
+      _loadTelemetry(),
+      _loadCampaignProgress(),
+      _loadRoadmapProgress(),
+      _loadLearnerMemory(),
+    ]);
+    if (!mounted) return;
+
+    final hasLocalData = _savedItems.isNotEmpty ||
+        _weaknesses.isNotEmpty ||
+        _mistakes.isNotEmpty ||
+        _abilityRecords.isNotEmpty ||
+        _trainingHistory.isNotEmpty ||
+        _speakingHistory.isNotEmpty;
+    _localUpdatedAt = hasLocalData
+        ? DateTime.now()
+        : DateTime.fromMillisecondsSinceEpoch(0);
+
+    await _refreshLearnerMemory();
+    _autoSyncEnabled = await _cloudSyncService.loadAutoSyncEnabled();
+    final lastSync = await _cloudSyncService.loadLastSyncedAt();
+    final session = await _cloudSyncService.loadSession();
+    if (!mounted) return;
+    setState(() {
+      _cloudStatus = session == null
+          ? const CloudSyncStatus.signedOut()
+          : CloudSyncStatus(
+              phase: CloudSyncPhase.idle,
+              lastSyncedAt: lastSync,
+              email: session.email,
+            );
+    });
+    if (_autoSyncEnabled && session != null) {
+      await _autoSyncNow();
+    }
   }
 
   Future<void> _loadSavedItems() async {
