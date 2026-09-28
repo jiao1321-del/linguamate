@@ -175,15 +175,21 @@ class _MainShellState extends State<MainShell> {
     ]);
     if (!mounted) return;
 
+    final storedLocalUpdated =
+        await _cloudSyncService.loadLocalUpdatedAt();
     final hasLocalData = _savedItems.isNotEmpty ||
         _weaknesses.isNotEmpty ||
         _mistakes.isNotEmpty ||
         _abilityRecords.isNotEmpty ||
         _trainingHistory.isNotEmpty ||
         _speakingHistory.isNotEmpty;
-    _localUpdatedAt = hasLocalData
-        ? DateTime.now()
-        : DateTime.fromMillisecondsSinceEpoch(0);
+    _localUpdatedAt = storedLocalUpdated ??
+        (hasLocalData
+            ? DateTime.now()
+            : DateTime.fromMillisecondsSinceEpoch(0));
+    if (storedLocalUpdated == null && hasLocalData) {
+      await _cloudSyncService.markLocalUpdated(_localUpdatedAt);
+    }
 
     await _refreshLearnerMemory();
     _autoSyncEnabled = await _cloudSyncService.loadAutoSyncEnabled();
@@ -326,6 +332,7 @@ class _MainShellState extends State<MainShell> {
 
   void _markLocalChanged({bool refreshMemory = true}) {
     _localUpdatedAt = DateTime.now();
+    unawaited(_cloudSyncService.markLocalUpdated(_localUpdatedAt));
     if (refreshMemory) {
       unawaited(_refreshLearnerMemory());
     }
