@@ -863,6 +863,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Future<void> _sendSubmittedMessage(String submittedText) =>
       _sendCapturedMessage(submittedText: submittedText);
 
+  Future<void> _sendFromKeyboardAction() =>
+      _sendCapturedMessage(
+        submittedText: _controller.value.text,
+      );
+
   Future<void> _sendCapturedMessage({
     String? submittedText,
   }) async {
@@ -1296,6 +1301,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.send,
                     onChanged: (value) => _draftText = value,
+                    onEditingComplete: () {
+                      if (!_isSending) {
+                        unawaited(_sendFromKeyboardAction());
+                      }
+                    },
                     onSubmitted: (value) {
                       if (!_isSending) {
                         unawaited(_sendSubmittedMessage(value));
