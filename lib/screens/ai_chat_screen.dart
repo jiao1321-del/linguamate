@@ -1055,6 +1055,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardVisible =
+        MediaQuery.viewInsetsOf(context).bottom > 0;
+    final showDismissedSendFallback =
+        !_isRestoring &&
+        !_isSending &&
+        _savingIndex == null &&
+        !keyboardVisible &&
+        (_draftText.trim().isNotEmpty ||
+            _controller.text.trim().isNotEmpty);
+
     return SafeArea(
       child: Column(
         children: [
@@ -1288,93 +1298,120 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            child: Column(
               children: [
-                Expanded(
-                  child: TextField(
-                    key: const ValueKey('chat-input'),
-                    controller: _controller,
-                    enabled: !_isRestoring && _savingIndex == null,
-                    minLines: 1,
-                    maxLines: 3,
-                    keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.send,
-                    onChanged: (value) => _draftText = value,
-                    onEditingComplete: () {
-                      if (!_isSending) {
-                        unawaited(_sendFromKeyboardAction());
-                      }
-                    },
-                    onSubmitted: (value) {
-                      if (!_isSending) {
-                        unawaited(_sendSubmittedMessage(value));
-                      }
-                    },
-                    decoration: InputDecoration(
-                      hintText: _isRestoring
-                          ? '正在載入對話...'
-                          : '用 $_targetLanguage 練習...',
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
+                if (showDismissedSendFallback)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonalIcon(
+                        key: const ValueKey(
+                          'send-after-keyboard-dismiss',
+                        ),
+                        onPressed: _sendMessage,
+                        icon: const Icon(Icons.send_rounded),
+                        label: const Text(
+                          '鍵盤已收起 · 送出這句',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 42,
-                  height: 44,
-                  child: IconButton(
-                    key: const ValueKey('voice-chat-input'),
-                    tooltip: '語音輸入',
-                    onPressed: _isRestoring || _isSending || _isListening
-                        ? null
-                        : _startVoiceInput,
-                    icon: _isListening
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.mic_none_rounded),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Listener(
-                  behavior: HitTestBehavior.opaque,
-                  onPointerDown: (_) {
-                    if (!_isRestoring &&
-                        !_isSending &&
-                        _savingIndex == null) {
-                      unawaited(_sendMessage());
-                    }
-                  },
-                  child: SizedBox(
-                    width: 46,
-                    height: 46,
-                    child: IconButton.filled(
-                      key: const ValueKey('send-chat-message'),
-                      tooltip: '送出',
-                      onPressed:
-                          _isRestoring || _isSending || _savingIndex != null
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        key: const ValueKey('chat-input'),
+                        controller: _controller,
+                        enabled: !_isRestoring && _savingIndex == null,
+                        minLines: 1,
+                        maxLines: 3,
+                        keyboardType: TextInputType.text,
+                        textInputAction: TextInputAction.send,
+                        onChanged: (value) => _draftText = value,
+                        onEditingComplete: () {
+                          if (!_isSending) {
+                            unawaited(_sendFromKeyboardAction());
+                          }
+                        },
+                        onSubmitted: (value) {
+                          if (!_isSending) {
+                            unawaited(_sendSubmittedMessage(value));
+                          }
+                        },
+                        decoration: InputDecoration(
+                          hintText: _isRestoring
+                              ? '正在載入對話...'
+                              : '用 $_targetLanguage 練習...',
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 42,
+                      height: 44,
+                      child: IconButton(
+                        key: const ValueKey('voice-chat-input'),
+                        tooltip: '語音輸入',
+                        onPressed:
+                            _isRestoring || _isSending || _isListening
+                                ? null
+                                : _startVoiceInput,
+                        icon: _isListening
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.mic_none_rounded),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Listener(
+                      behavior: HitTestBehavior.opaque,
+                      onPointerDown: (_) {
+                        if (!_isRestoring &&
+                            !_isSending &&
+                            _savingIndex == null) {
+                          unawaited(_sendMessage());
+                        }
+                      },
+                      child: SizedBox(
+                        width: 46,
+                        height: 46,
+                        child: IconButton.filled(
+                          key: const ValueKey('send-chat-message'),
+                          tooltip: '送出',
+                          onPressed: _isRestoring ||
+                                  _isSending ||
+                                  _savingIndex != null
                               ? null
                               : _sendMessage,
-                      icon: _isSending
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.send_rounded),
+                          icon: _isSending
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.send_rounded),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
