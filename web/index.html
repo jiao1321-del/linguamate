@@ -24,46 +24,6 @@
 </head>
 <body>
   <script>
-    (() => {
-      let lastComposerDraft = '';
-
-      const readValue = (target) => {
-        if (!target) return '';
-        if (typeof target.value === 'string') return target.value;
-        return '';
-      };
-
-      const rememberDraft = (event) => {
-        const value = readValue(event.target);
-        if (value.trim().length > 0) {
-          lastComposerDraft = value;
-        }
-      };
-
-      window.addEventListener('input', rememberDraft, true);
-      window.addEventListener('change', rememberDraft, true);
-
-      window.linguamateReadComposerDraft = () => {
-        const active = readValue(document.activeElement);
-        if (active.trim().length > 0) return active;
-
-        const fields = Array.from(
-          document.querySelectorAll('input, textarea'),
-        );
-        for (let i = fields.length - 1; i >= 0; i -= 1) {
-          const value = readValue(fields[i]);
-          if (value.trim().length > 0) return value;
-        }
-        return lastComposerDraft;
-      };
-
-      window.linguamateClearComposerDraft = () => {
-        lastComposerDraft = '';
-      };
-    })();
-  </script>
-
-  <script>
     (async () => {
       try {
         if ('serviceWorker' in navigator) {
