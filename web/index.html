@@ -25,65 +25,46 @@
 <body>
   <script>
     (() => {
-      let lastNativeSendAt = 0;
+      let sendButton = null;
 
-      const isTextEditor = (target) =>
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target?.isContentEditable === true;
+      window.linguamateSetSendFallbackVisible = (visible) => {
+        if (!sendButton) {
+          sendButton = document.createElement('button');
+          sendButton.type = 'button';
+          sendButton.setAttribute('aria-label', '送出文字');
+          sendButton.textContent = '↑';
+          Object.assign(sendButton.style, {
+            position: 'fixed',
+            right: '14px',
+            bottom: '86px',
+            width: '52px',
+            height: '52px',
+            border: '0',
+            borderRadius: '26px',
+            background: '#6750A4',
+            color: '#ffffff',
+            fontSize: '28px',
+            fontWeight: '700',
+            lineHeight: '52px',
+            textAlign: 'center',
+            zIndex: '2147483647',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.20)',
+            display: 'none',
+            padding: '0',
+          });
+          sendButton.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            window.dispatchEvent(
+              new CustomEvent('linguamate-send-signal', {
+                detail: { source: 'native-button' },
+              }),
+            );
+          });
+          document.body.appendChild(sendButton);
+        }
 
-      const emitKeyboardSend = (source) => {
-        const now = Date.now();
-        if (now - lastNativeSendAt < 350) return;
-        lastNativeSendAt = now;
-        window.dispatchEvent(
-          new CustomEvent('linguamate-keyboard-send', {
-            detail: { source },
-          }),
-        );
+        sendButton.style.display = visible ? 'block' : 'none';
       };
-
-      window.addEventListener(
-        'keydown',
-        (event) => {
-          if (
-            event.key === 'Enter' &&
-            !event.shiftKey &&
-            isTextEditor(event.target)
-          ) {
-            emitKeyboardSend('keydown');
-          }
-        },
-        true,
-      );
-
-      window.addEventListener(
-        'keyup',
-        (event) => {
-          if (
-            event.key === 'Enter' &&
-            !event.shiftKey &&
-            isTextEditor(event.target)
-          ) {
-            emitKeyboardSend('keyup');
-          }
-        },
-        true,
-      );
-
-      window.addEventListener(
-        'beforeinput',
-        (event) => {
-          if (
-            (event.inputType === 'insertLineBreak' ||
-              event.inputType === 'insertParagraph') &&
-            isTextEditor(event.target)
-          ) {
-            emitKeyboardSend('beforeinput');
-          }
-        },
-        true,
-      );
     })();
   </script>
 
