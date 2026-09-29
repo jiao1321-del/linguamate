@@ -673,6 +673,43 @@ void main() {
     expect(find.text('I hear you.'), findsOneWidget);
   });
 
+  testWidgets('AI chat can send from inline composer fallback',
+      (tester) async {
+    String? sentMessage;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiChatScreen(
+            onSend: (message, targetLanguage, scenario, history) async {
+              sentMessage = message;
+              return const AiCoachReply(
+                reply: 'Inline send works.',
+                correction: '',
+                explanation: '備援送出。',
+                translation: '內嵌送出成功。',
+              );
+            },
+            onSaveLearning: (_) async => true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const ValueKey('chat-input'));
+    await tester.enterText(field, 'send from inside');
+    await tester.pump();
+
+    await tester.tap(
+      find.byKey(const ValueKey('inline-send-chat-message')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(sentMessage, 'send from inside');
+    expect(find.text('Inline send works.'), findsOneWidget);
+  });
+
   testWidgets('AI chat sends Traditional Chinese text from dedicated button',
       (tester) async {
     String? sentMessage;
