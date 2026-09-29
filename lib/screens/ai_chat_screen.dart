@@ -11,6 +11,7 @@ import '../services/ai_chat_store.dart';
 import '../services/practice_starter_service.dart';
 import '../services/roleplay_mission_service.dart';
 import '../services/speech_coach_service.dart';
+import '../services/web_keyboard_send_bridge.dart';
 import '../widgets/gilded_card_icon.dart';
 import '../widgets/shili_coach_avatar.dart';
 import '../widgets/shili_coach_header.dart';
@@ -90,6 +91,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   String? _failedDraft;
   String _draftText = '';
   bool _missionCompletionReported = false;
+  StreamSubscription<void>? _webKeyboardSendSubscription;
   late List<AiChatMessage> _entries;
 
   @override
@@ -97,11 +99,22 @@ class _AiChatScreenState extends State<AiChatScreen> {
     super.initState();
     _speechService = widget.speechService ?? createSpeechCoachService();
     _entries = [_welcomeEntry(_targetLanguage, _scenario)];
+    _webKeyboardSendSubscription =
+        const WebKeyboardSendBridge().events.listen((_) {
+      if (!mounted ||
+          _isRestoring ||
+          _isSending ||
+          _savingIndex != null) {
+        return;
+      }
+      unawaited(_sendFromKeyboardAction());
+    });
     _restoreConversation();
   }
 
   @override
   void dispose() {
+    _webKeyboardSendSubscription?.cancel();
     _speechService.stop();
     _controller.dispose();
     _scrollController.dispose();
@@ -1317,6 +1330,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
                           : '用 $_targetLanguage 練習...',
                       filled: true,
                       fillColor: Colors.white,
+                      suffixIcon: Listener(
+                        behavior: HitTestBehavior.opaque,
+                        onPointerDown: (_) {
+                          if (!_isRestoring &&
+                              !_isSending &&
+                              _savingIndex == null) {
+                            unawaited(_sendMessage());
+                          }
+                        },
+                        child: IconButton(
+                          key: const ValueKey('inline-send-chat-message'),
+                          tooltip: '送出文字',
+                          onPressed: _isRestoring ||
+                                  _isSending ||
+                                  _savingIndex != null
+                              ? null
+                              : _sendMessage,
+                          icon: const Icon(Icons.arrow_upward_rounded),
+                        ),
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide.none,
