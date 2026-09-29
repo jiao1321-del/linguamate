@@ -24,6 +24,70 @@
 </head>
 <body>
   <script>
+    (() => {
+      let lastNativeSendAt = 0;
+
+      const isTextEditor = (target) =>
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable === true;
+
+      const emitKeyboardSend = (source) => {
+        const now = Date.now();
+        if (now - lastNativeSendAt < 350) return;
+        lastNativeSendAt = now;
+        window.dispatchEvent(
+          new CustomEvent('linguamate-keyboard-send', {
+            detail: { source },
+          }),
+        );
+      };
+
+      window.addEventListener(
+        'keydown',
+        (event) => {
+          if (
+            event.key === 'Enter' &&
+            !event.shiftKey &&
+            isTextEditor(event.target)
+          ) {
+            emitKeyboardSend('keydown');
+          }
+        },
+        true,
+      );
+
+      window.addEventListener(
+        'keyup',
+        (event) => {
+          if (
+            event.key === 'Enter' &&
+            !event.shiftKey &&
+            isTextEditor(event.target)
+          ) {
+            emitKeyboardSend('keyup');
+          }
+        },
+        true,
+      );
+
+      window.addEventListener(
+        'beforeinput',
+        (event) => {
+          if (
+            (event.inputType === 'insertLineBreak' ||
+              event.inputType === 'insertParagraph') &&
+            isTextEditor(event.target)
+          ) {
+            emitKeyboardSend('beforeinput');
+          }
+        },
+        true,
+      );
+    })();
+  </script>
+
+  <script>
     (async () => {
       try {
         if ('serviceWorker' in navigator) {
