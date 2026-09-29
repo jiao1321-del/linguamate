@@ -85,6 +85,7 @@ void main() {
         home: GrowthCenterScreen(
           report: buildReport(),
           initialDailyGoal: 10,
+          now: DateTime(2026, 9, 28, 12),
           onDailyGoalChanged: (goal) async {
             selectedGoal = goal;
           },
