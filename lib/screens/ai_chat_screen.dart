@@ -153,6 +153,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         _missionCompletionReported = false;
         _isRestoring = false;
       });
+      _draftText = requestedMission.suggestedOpening;
       _controller.value = TextEditingValue(
         text: requestedMission.suggestedOpening,
         selection: TextSelection.collapsed(
@@ -450,6 +451,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _entries = [_welcomeEntry(_targetLanguage, scenario)];
       _error = null;
     });
+    _draftText = '';
     _controller.clear();
     await _persistConversation();
   }
@@ -564,6 +566,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _entries = [_welcomeEntry(_targetLanguage, _scenario)];
       _error = null;
     });
+    _draftText = '';
     _controller.clear();
     await _persistConversation();
   }
@@ -650,6 +653,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     if (!mounted || selected == null) return;
 
+    _draftText = selected;
     _controller.value = TextEditingValue(
       text: selected,
       selection: TextSelection.collapsed(offset: selected.length),
@@ -843,6 +847,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _entries = [_welcomeEntry(_targetLanguage, _scenario)];
       _error = null;
     });
+    _draftText = '';
     _controller.clear();
     await _persistConversation();
 
