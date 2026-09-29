@@ -312,7 +312,7 @@ class _LearnScreenState extends State<LearnScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '✨ 學習重點',
+                      '✨ 學習重點（中文說明）',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),

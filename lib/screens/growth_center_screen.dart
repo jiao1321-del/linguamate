@@ -8,12 +8,14 @@ class GrowthCenterScreen extends StatefulWidget {
   final LearningProgressReport report;
   final int initialDailyGoal;
   final Future<void> Function(int goal)? onDailyGoalChanged;
+  final DateTime? now;
 
   const GrowthCenterScreen({
     super.key,
     required this.report,
     this.initialDailyGoal = DailyGoalStore.defaultGoal,
     this.onDailyGoalChanged,
+    this.now,
   });
 
   @override
@@ -39,7 +41,7 @@ class _GrowthCenterScreenState extends State<GrowthCenterScreen> {
   Widget build(BuildContext context) {
     final snapshot = LearningGrowthSnapshot.fromReport(
       report: widget.report,
-      now: DateTime.now(),
+      now: widget.now ?? DateTime.now(),
       dailyGoal: _dailyGoal,
     );
 
