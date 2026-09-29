@@ -11,7 +11,7 @@ import '../services/ai_chat_store.dart';
 import '../services/practice_starter_service.dart';
 import '../services/roleplay_mission_service.dart';
 import '../services/speech_coach_service.dart';
-import '../services/web_keyboard_send_bridge.dart';
+import '../services/web_send_signal_bridge.dart';
 import '../widgets/gilded_card_icon.dart';
 import '../widgets/shili_coach_avatar.dart';
 import '../widgets/shili_coach_header.dart';
@@ -91,7 +91,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   String? _failedDraft;
   String _draftText = '';
   bool _missionCompletionReported = false;
-  StreamSubscription<void>? _webKeyboardSendSubscription;
+  StreamSubscription<void>? _webSendSignalSubscription;
   late List<AiChatMessage> _entries;
 
   @override
@@ -99,8 +99,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
     super.initState();
     _speechService = widget.speechService ?? createSpeechCoachService();
     _entries = [_welcomeEntry(_targetLanguage, _scenario)];
-    _webKeyboardSendSubscription =
-        const WebKeyboardSendBridge().events.listen((_) {
+    _webSendSignalSubscription =
+        const WebSendSignalBridge().events.listen((_) {
       if (!mounted ||
           _isRestoring ||
           _isSending ||
@@ -114,7 +114,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   @override
   void dispose() {
-    _webKeyboardSendSubscription?.cancel();
+    _webSendSignalSubscription?.cancel();
     _speechService.stop();
     _controller.dispose();
     _scrollController.dispose();
