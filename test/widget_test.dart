@@ -637,6 +637,42 @@ void main() {
     expect(find.text('Got it.'), findsOneWidget);
   });
 
+  testWidgets('AI chat can send from iPhone editing-complete keyboard action',
+      (tester) async {
+    String? sentMessage;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiChatScreen(
+            onSend: (message, targetLanguage, scenario, history) async {
+              sentMessage = message;
+              return const AiCoachReply(
+                reply: 'I hear you.',
+                correction: '',
+                explanation: '自然回覆。',
+                translation: '我懂你的意思。',
+              );
+            },
+            onSaveLearning: (_) async => true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final fieldFinder = find.byKey(const ValueKey('chat-input'));
+    await tester.enterText(fieldFinder, 'im work right now');
+    await tester.pump();
+
+    final field = tester.widget<TextField>(fieldFinder);
+    field.onEditingComplete?.call();
+    await tester.pumpAndSettle();
+
+    expect(sentMessage, 'im work right now');
+    expect(find.text('I hear you.'), findsOneWidget);
+  });
+
   testWidgets('AI chat sends Traditional Chinese text from dedicated button',
       (tester) async {
     String? sentMessage;
