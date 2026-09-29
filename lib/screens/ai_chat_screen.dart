@@ -88,6 +88,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   int? _savingIndex;
   String? _error;
   String? _failedDraft;
+  String _draftText = '';
   bool _missionCompletionReported = false;
   late List<AiChatMessage> _entries;
 
@@ -261,10 +262,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
       );
       if (!mounted || transcript == null || transcript.trim().isEmpty) return;
 
+      final value = transcript.trim();
+      _draftText = value;
       _controller.value = TextEditingValue(
-        text: transcript.trim(),
+        text: value,
         selection: TextSelection.collapsed(
-          offset: transcript.trim().length,
+          offset: value.length,
         ),
       );
     } finally {
@@ -427,6 +430,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _entries = [_welcomeEntry(language, _scenario)];
       _error = null;
     });
+    _draftText = '';
     _controller.clear();
     await _persistConversation();
   }
@@ -485,6 +489,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _missionCompletionReported = false;
       _error = null;
     });
+    _draftText = mission.suggestedOpening;
     _controller.value = TextEditingValue(
       text: mission.suggestedOpening,
       selection: TextSelection.collapsed(
@@ -847,12 +852,28 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
-  Future<void> _sendMessage() async {
+  Future<void> _sendMessage() =>
+      _sendCapturedMessage();
+
+  Future<void> _sendSubmittedMessage(String submittedText) =>
+      _sendCapturedMessage(submittedText: submittedText);
+
+  Future<void> _sendCapturedMessage({
+    String? submittedText,
+  }) async {
     if (_isRestoring || _isSending || _savingIndex != null) return;
 
-    // Capture the current controller value BEFORE changing focus. This keeps
-    // the user's in-progress iOS IME composition from being lost.
-    final message = _controller.value.text.trim();
+    // iOS Safari/PWA can briefly detach the HTML text input when a nearby
+    // button is tapped. Keep the last onChanged value as a fallback so a
+    // visible draft can never become an empty send.
+    final submitted = submittedText?.trim() ?? '';
+    final controllerText = _controller.value.text.trim();
+    final fallback = _draftText.trim();
+    final message = submitted.isNotEmpty
+        ? submitted
+        : controllerText.isNotEmpty
+            ? controllerText
+            : fallback;
     if (message.isEmpty) return;
 
     final history = _entries
@@ -868,6 +889,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _entries.add(AiChatMessage(mine: true, text: message));
       _isSending = true;
       _error = null;
+      _draftText = '';
     });
 
     _clearComposerAfterSend(message);
@@ -945,6 +967,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         _failedDraft = message;
         _error = error.toString();
       });
+      _draftText = message;
       _controller.value = TextEditingValue(
         text: message,
         selection: TextSelection.collapsed(offset: message.length),
@@ -1267,9 +1290,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     maxLines: 3,
                     keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.send,
-                    onSubmitted: (_) {
+                    onChanged: (value) => _draftText = value,
+                    onSubmitted: (value) {
                       if (!_isSending) {
-                        unawaited(_sendMessage());
+                        unawaited(_sendSubmittedMessage(value));
                       }
                     },
                     decoration: InputDecoration(
@@ -1305,26 +1329,36 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                SizedBox(
-                  width: 46,
-                  height: 46,
-                  child: IconButton.filled(
-                    key: const ValueKey('send-chat-message'),
-                    tooltip: '送出',
-                    onPressed:
-                        _isRestoring || _isSending || _savingIndex != null
-                            ? null
-                            : _sendMessage,
-                    icon: _isSending
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.send_rounded),
+                Listener(
+                  behavior: HitTestBehavior.opaque,
+                  onPointerDown: (_) {
+                    if (!_isRestoring &&
+                        !_isSending &&
+                        _savingIndex == null) {
+                      unawaited(_sendMessage());
+                    }
+                  },
+                  child: SizedBox(
+                    width: 46,
+                    height: 46,
+                    child: IconButton.filled(
+                      key: const ValueKey('send-chat-message'),
+                      tooltip: '送出',
+                      onPressed:
+                          _isRestoring || _isSending || _savingIndex != null
+                              ? null
+                              : _sendMessage,
+                      icon: _isSending
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.send_rounded),
+                    ),
                   ),
                 ),
               ],
